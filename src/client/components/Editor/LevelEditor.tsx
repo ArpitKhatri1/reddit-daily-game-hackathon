@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { v4 as uuidv4 } from "uuid";
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import type {
   GearInstance,
   GearInventoryItem,
@@ -8,40 +8,53 @@ import type {
   LevelDefinition,
   Position,
   RotationDirection,
-} from "../../types";
-import { GEAR_DIMENSIONS, SNAP_TOLERANCE } from "../../lib/constants";
+} from '../../types';
+import { GEAR_DIMENSIONS, SNAP_TOLERANCE } from '../../lib/constants';
 import {
   findSnapTarget,
   propagateRotation,
   initializeStartGears,
   checkWinCondition,
-} from "../../lib/engine";
-import { saveCustomLevel } from "../../lib/storage";
-import GearSVG from "../Gear/GearSVG";
+} from '../../lib/engine';
+import { saveCustomLevel } from '../../lib/storage';
+import { saveDraft, publishLevel, publishDaily, toLevelData } from '../../lib/api';
+import { usePanZoom } from '../../hooks/usePanZoom';
+import GearSVG from '../Gear/GearSVG';
 
-type EditorMode = "edit" | "test";
+type EditorMode = 'edit' | 'test';
 
 interface LevelEditorProps {
   onBack: () => void;
   existingLevel?: LevelDefinition;
+  isDailyMode?: boolean;
 }
 
-const GEAR_SIZES: GearSize[] = ["small", "medium", "large", "extraLarge"];
+const GEAR_SIZES: GearSize[] = ['small', 'medium', 'large', 'extraLarge'];
 const DIRECTION_OPTIONS: { label: string; value: RotationDirection }[] = [
-  { label: "Any", value: "any" },
-  { label: "CW ↻", value: "cw" },
-  { label: "CCW ↺", value: "ccw" },
+  { label: 'Any', value: 'any' },
+  { label: 'CW ↻', value: 'cw' },
+  { label: 'CCW ↺', value: 'ccw' },
 ];
 
-export default function LevelEditor({
-  onBack,
-  existingLevel,
-}: LevelEditorProps) {
+export default function LevelEditor({ onBack, existingLevel, isDailyMode }: LevelEditorProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   const animFrameRef = useRef<number>(0);
 
-  const [mode, setMode] = useState<EditorMode>("edit");
-  const [levelName, setLevelName] = useState(existingLevel?.name || "My Level");
+  const panZoom = usePanZoom({ minZoom: 0.3, maxZoom: 2.0 });
+  const {
+    clientToCanvas,
+    canvasTransform,
+    handleWheel,
+    handlePointerDown: pzPointerDown,
+    handlePointerMove: pzPointerMove,
+    handlePointerUp: pzPointerUp,
+    cancelPan,
+    zoom,
+    resetView,
+  } = panZoom;
+
+  const [mode, setMode] = useState<EditorMode>('edit');
+  const [levelName, setLevelName] = useState(existingLevel?.name || 'My Level');
 
   // Board gears (start + goal + positional preview gears)
   const [gears, setGears] = useState<GearInstance[]>([]);
@@ -53,9 +66,8 @@ export default function LevelEditor({
 
   // Placement tool state
   const [placingRole, setPlacingRole] = useState<GearRole | null>(null);
-  const [placingSize, setPlacingSize] = useState<GearSize>("medium");
-  const [placingDirection, setPlacingDirection] =
-    useState<RotationDirection>("any");
+  const [placingSize, setPlacingSize] = useState<GearSize>('medium');
+  const [placingDirection, setPlacingDirection] = useState<RotationDirection>('any');
 
   // Test mode inventory (separate copy)
   const [testInventory, setTestInventory] = useState<GearInventoryItem[]>([]);
@@ -101,7 +113,7 @@ export default function LevelEditor({
             return { ...g, angle: (g.angle + jitter * 0.1) % 360 };
           }
           return { ...g, angle: (g.angle + g.rotationSpeed) % 360 };
-        }),
+        })
       );
       animFrameRef.current = requestAnimationFrame(animate);
     };
@@ -111,12 +123,7 @@ export default function LevelEditor({
 
   // Win check in test mode
   useEffect(() => {
-    if (
-      mode === "test" &&
-      !testWon &&
-      gears.length > 0 &&
-      checkWinCondition(gears)
-    ) {
+    if (mode === 'test' && !testWon && gears.length > 0 && checkWinCondition(gears)) {
       setTestWon(true);
     }
   }, [gears, mode, testWon]);
@@ -126,32 +133,33 @@ export default function LevelEditor({
     (clientX: number, clientY: number): Position => {
       if (!boardRef.current) return { x: clientX, y: clientY };
       const rect = boardRef.current.getBoundingClientRect();
-      return { x: clientX - rect.left, y: clientY - rect.top };
+      return clientToCanvas(clientX, clientY, rect);
     },
-    [],
+    [clientToCanvas]
   );
 
   // ─── Edit mode: click to place start/goal ──────────────────────────────
   const handleBoardClick = useCallback(
     (e: React.MouseEvent) => {
-      if (mode !== "edit" || !placingRole) return;
+      if (mode !== 'edit' || !placingRole) return;
       if (dragging) return;
       if (!boardRef.current) return;
       const rect = boardRef.current.getBoundingClientRect();
       const dim = GEAR_DIMENSIONS[placingSize];
+      const canvasPos = clientToCanvas(e.clientX, e.clientY, rect);
       const pos: Position = {
-        x: e.clientX - rect.left - dim.outerRadius,
-        y: e.clientY - rect.top - dim.outerRadius,
+        x: canvasPos.x - dim.outerRadius,
+        y: canvasPos.y - dim.outerRadius,
       };
 
-      const startCount = gears.filter((g) => g.role === "start").length;
-      const goalCount = gears.filter((g) => g.role === "goal").length;
-      if (placingRole === "start" && startCount >= 5) {
-        alert("Maximum 5 start gears allowed!");
+      const startCount = gears.filter((g) => g.role === 'start').length;
+      const goalCount = gears.filter((g) => g.role === 'goal').length;
+      if (placingRole === 'start' && startCount >= 5) {
+        alert('Maximum 5 start gears allowed!');
         return;
       }
-      if (placingRole === "goal" && goalCount >= 2) {
-        alert("Maximum 2 goal gears allowed!");
+      if (placingRole === 'goal' && goalCount >= 2) {
+        alert('Maximum 2 goal gears allowed!');
         return;
       }
 
@@ -161,31 +169,30 @@ export default function LevelEditor({
         size: placingSize,
         position: pos,
         angle: 0,
-        rotationSpeed: placingRole === "start" ? 0.8 : 0,
+        rotationSpeed: placingRole === 'start' ? 0.8 : 0,
         meshedWith: [],
-        requiredDirection:
-          placingRole === "goal" ? placingDirection : undefined,
       };
+      if (placingRole === 'goal') newGear.requiredDirection = placingDirection;
 
       setGears((prev) => propagateRotation([...prev, newGear]));
       setPlacingRole(null);
     },
-    [mode, placingRole, placingSize, placingDirection, gears, dragging],
+    [mode, placingRole, placingSize, placingDirection, gears, dragging, clientToCanvas]
   );
 
   // ─── Right-click to remove ──────────────────────────────────────────────
   const handleGearRightClick = useCallback(
     (e: React.MouseEvent, gear: GearInstance) => {
       e.preventDefault();
-      if (mode === "edit") {
-        if (gear.role === "positional") {
+      if (mode === 'edit') {
+        if (gear.role === 'positional') {
           setEditPlacedInventory((prev) => prev.filter((id) => id !== gear.id));
         }
         setGears((prev) => {
           const filtered = prev.filter((g) => g.id !== gear.id);
           return propagateRotation(filtered);
         });
-      } else if (mode === "test" && gear.role === "positional") {
+      } else if (mode === 'test' && gear.role === 'positional') {
         setGears((prev) => {
           const filtered = prev.filter((g) => g.id !== gear.id);
           return propagateRotation(filtered);
@@ -193,7 +200,7 @@ export default function LevelEditor({
         setTestInventory((prev) => [...prev, { id: gear.id, size: gear.size }]);
       }
     },
-    [mode],
+    [mode]
   );
 
   // ─── Inventory management ───────────────────────────────────────────────
@@ -214,37 +221,36 @@ export default function LevelEditor({
 
   // Remaining edit inventory (not yet placed on board)
   const remainingEditInventory = inventoryDef.filter(
-    (item) => !editPlacedInventory.includes(item.id),
+    (item) => !editPlacedInventory.includes(item.id)
   );
 
   // ─── Test mode ──────────────────────────────────────────────────────────
   const startTest = () => {
     // Remove positional preview gears, keep only fixed
-    const fixedOnly = gears.filter((g) => g.role !== "positional");
+    const fixedOnly = gears.filter((g) => g.role !== 'positional');
     const initialized = initializeStartGears(fixedOnly);
     setGears(propagateRotation(initialized));
     setTestInventory([...inventoryDef]);
     setTestWon(false);
-    setMode("test");
+    setMode('test');
   };
 
   const stopTest = () => {
     // Remove test positionals, restore edit-placed positionals
     setGears((prev) => {
       const fixed = prev.filter(
-        (g) => g.role !== "positional" || editPlacedInventory.includes(g.id),
+        (g) => g.role !== 'positional' || editPlacedInventory.includes(g.id)
       );
-      return propagateRotation(
-        fixed.map((g) => ({ ...g, angle: 0, meshedWith: [] })),
-      );
+      return propagateRotation(fixed.map((g) => ({ ...g, angle: 0, meshedWith: [] })));
     });
-    setTestWon(false);
-    setMode("edit");
+    // Keep testWon state so user knows they can publish
+    setMode('edit');
   };
 
   // ─── Drag: start from inventory (edit or test) ─────────────────────────
   const handleInventoryDragStart = useCallback(
     (item: GearInventoryItem, clientX: number, clientY: number) => {
+      cancelPan();
       const pos = getBoardPos(clientX, clientY);
       const dim = GEAR_DIMENSIONS[item.size];
       setDragging({
@@ -255,18 +261,20 @@ export default function LevelEditor({
         snapTarget: null,
       });
     },
-    [getBoardPos],
+    [getBoardPos, cancelPan]
   );
 
   // ─── Drag: start from existing board gear ──────────────────────────────
   const handleBoardGearDragStart = useCallback(
     (gear: GearInstance, clientX: number, clientY: number) => {
       const pos = getBoardPos(clientX, clientY);
-      const isFixed = gear.role === "start" || gear.role === "goal";
+      const isFixed = gear.role === 'start' || gear.role === 'goal';
 
       // In edit mode: allow dragging ALL gears (start, goal, positional)
       // In test mode: only positional
-      if (mode === "test" && gear.role !== "positional") return;
+      if (mode === 'test' && gear.role !== 'positional') return;
+
+      cancelPan();
 
       setGears((prev) => {
         const filtered = prev.filter((g) => g.id !== gear.id);
@@ -282,13 +290,13 @@ export default function LevelEditor({
         },
         currentPos: { x: gear.position.x, y: gear.position.y },
         snapTarget: null,
-        isFixedGearDrag: isFixed && mode === "edit",
+        isFixedGearDrag: isFixed && mode === 'edit',
         originalRole: gear.role,
         originalDirection: gear.requiredDirection,
         originalSpeed: gear.rotationSpeed,
       });
     },
-    [getBoardPos, mode],
+    [getBoardPos, mode, cancelPan]
   );
 
   // ─── Drag: pointer move ─────────────────────────────────────────────────
@@ -308,15 +316,13 @@ export default function LevelEditor({
       const snap = findSnapTarget(
         centerPos,
         dragging.size,
-        dragging.gearId || dragging.inventoryId || "",
+        dragging.gearId || dragging.inventoryId || '',
         gears,
-        SNAP_TOLERANCE,
+        SNAP_TOLERANCE
       );
-      setDragging((prev) =>
-        prev ? { ...prev, currentPos: gearPos, snapTarget: snap } : null,
-      );
+      setDragging((prev) => (prev ? { ...prev, currentPos: gearPos, snapTarget: snap } : null));
     },
-    [dragging, gears, getBoardPos],
+    [dragging, gears, getBoardPos]
   );
 
   // ─── Drag: pointer up (place gear) ─────────────────────────────────────
@@ -336,7 +342,7 @@ export default function LevelEditor({
       // Re-place the fixed gear (start/goal) at new position
       const movedGear: GearInstance = {
         id: dragging.gearId!,
-        role: dragging.originalRole || "start",
+        role: dragging.originalRole || 'start',
         size: dragging.size,
         position: placementPos,
         angle: 0,
@@ -348,11 +354,8 @@ export default function LevelEditor({
     } else {
       // Positional gear placement
       const newGear: GearInstance = {
-        id:
-          dragging.gearId ||
-          dragging.inventoryId ||
-          "gear-" + Date.now().toString(),
-        role: "positional",
+        id: dragging.gearId || dragging.inventoryId || 'gear-' + Date.now().toString(),
+        role: 'positional',
         size: dragging.size,
         position: placementPos,
         angle: 0,
@@ -361,12 +364,10 @@ export default function LevelEditor({
       };
 
       if (dragging.inventoryId) {
-        if (mode === "edit") {
+        if (mode === 'edit') {
           setEditPlacedInventory((prev) => [...prev, dragging.inventoryId!]);
         } else {
-          setTestInventory((prev) =>
-            prev.filter((item) => item.id !== dragging.inventoryId),
-          );
+          setTestInventory((prev) => prev.filter((item) => item.id !== dragging.inventoryId));
         }
       }
       setGears((prev) => propagateRotation([...prev, newGear]));
@@ -374,26 +375,26 @@ export default function LevelEditor({
     setDragging(null);
   }, [dragging, mode]);
 
-  // ─── Save ───────────────────────────────────────────────────────────────
-  const handleSave = () => {
-    const starts = gears.filter((g) => g.role === "start");
-    const goals = gears.filter((g) => g.role === "goal");
+  // ─── Build level definition helper ───────────────────────────────────────
+  const buildLevelDef = (): LevelDefinition | null => {
+    const starts = gears.filter((g) => g.role === 'start');
+    const goals = gears.filter((g) => g.role === 'goal');
     if (starts.length === 0) {
-      alert("Add at least one start gear!");
-      return;
+      alert('Add at least one start gear!');
+      return null;
     }
     if (goals.length === 0) {
-      alert("Add at least one goal gear!");
-      return;
+      alert('Add at least one goal gear!');
+      return null;
     }
 
-    const levelDef: LevelDefinition = {
+    return {
       id: existingLevel?.id || uuidv4(),
       name: levelName,
-      description: "",
+      description: '',
       createdAt: new Date().toISOString(),
       fixedGears: gears
-        .filter((g) => g.role !== "positional")
+        .filter((g) => g.role !== 'positional')
         .map((g) => ({
           id: g.id,
           role: g.role,
@@ -404,34 +405,90 @@ export default function LevelEditor({
         })),
       inventory: inventoryDef,
     };
+  };
+
+  // ─── Save (local + server draft) ───────────────────────────────────────
+  const handleSave = async () => {
+    const levelDef = buildLevelDef();
+    if (!levelDef) return;
 
     saveCustomLevel(levelDef);
-    alert("Level saved!");
+    try {
+      await saveDraft(toLevelData(levelDef));
+    } catch {
+      // Server save failed, local still saved
+    }
+    alert('Level saved!');
     onBack();
+  };
+
+  // ─── Publish as Reddit post ─────────────────────────────────────────────
+  const [publishing, setPublishing] = useState(false);
+
+  const handlePublish = async () => {
+    const levelDef = buildLevelDef();
+    if (!levelDef) return;
+
+    setPublishing(true);
+    try {
+      const data = toLevelData(levelDef);
+      const result = await publishLevel(data);
+      if (result.status === 'success') {
+        saveCustomLevel(levelDef);
+        alert(`Level published! Post URL: ${result.postUrl}`);
+        onBack();
+      } else {
+        alert(`Publish failed: ${result.message || 'Unknown error'}`);
+      }
+    } catch (err) {
+      alert(`Publish failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  // ─── Publish as daily puzzle (admin only) ───────────────────────────────
+  const handlePublishDaily = async () => {
+    const levelDef = buildLevelDef();
+    if (!levelDef) return;
+
+    if (!confirm('Publish this as a Daily Puzzle?')) return;
+
+    setPublishing(true);
+    try {
+      const data = toLevelData(levelDef);
+      const result = await publishDaily(data);
+      if (result.status === 'success') {
+        alert(`Daily Puzzle #${result.dailyNumber} published!`);
+        onBack();
+      } else {
+        alert(`Publish failed: ${result.message || 'Unknown error'}`);
+      }
+    } catch (err) {
+      alert(`Publish failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setPublishing(false);
+    }
   };
 
   // ─── Styles ─────────────────────────────────────────────────────────────
   const btnStyle = (active?: boolean) => ({
-    background: active ? "#FFD54F" : "#5D4037",
-    color: active ? "#3E2723" : "#D7CCC8",
-    border: active ? "2px solid #FFB300" : "1px solid #795548",
+    background: active ? '#FFD54F' : '#5D4037',
+    color: active ? '#3E2723' : '#D7CCC8',
+    border: active ? '2px solid #FFB300' : '1px solid #795548',
   });
 
-  const sidebarInventory =
-    mode === "edit" ? remainingEditInventory : testInventory;
+  const sidebarInventory = mode === 'edit' ? remainingEditInventory : testInventory;
   const lockedCount = gears.filter((g) => g.locked).length;
 
   return (
-    <div
-      className="flex flex-col h-screen w-screen"
-      style={{ background: "#2C1810" }}
-    >
+    <div className="flex flex-col h-screen w-screen" style={{ background: '#2C1810' }}>
       {/* Top bar */}
       <div
         className="flex items-center gap-3 px-4 py-2 shrink-0 flex-wrap"
         style={{
-          background: "linear-gradient(to bottom, #3E2723, #2C1810)",
-          borderBottom: "2px solid #5D4037",
+          background: 'linear-gradient(to bottom, #3E2723, #2C1810)',
+          borderBottom: '2px solid #5D4037',
         }}
       >
         <button
@@ -448,9 +505,9 @@ export default function LevelEditor({
           onChange={(e) => setLevelName(e.target.value)}
           className="px-3 py-1.5 rounded text-sm font-bold"
           style={{
-            background: "#4E342E",
-            color: "#D7CCC8",
-            border: "1px solid #795548",
+            background: '#4E342E',
+            color: '#D7CCC8',
+            border: '1px solid #795548',
             width: 180,
           }}
         />
@@ -459,34 +516,41 @@ export default function LevelEditor({
           <span
             className="text-xs px-2 py-0.5 rounded"
             style={{
-              background: mode === "edit" ? "#FFD54F" : "#EF5350",
-              color: mode === "edit" ? "#3E2723" : "#fff",
-              fontWeight: "bold",
+              background: mode === 'edit' ? '#FFD54F' : '#EF5350',
+              color: mode === 'edit' ? '#3E2723' : '#fff',
+              fontWeight: 'bold',
             }}
           >
-            {mode === "edit" ? "EDIT MODE" : "TEST MODE"}
+            {mode === 'edit' ? 'EDIT MODE' : 'TEST MODE'}
           </span>
           {lockedCount > 0 && (
             <span
               className="text-xs px-2 py-0.5 rounded font-bold animate-pulse"
-              style={{ background: "#FF6F00", color: "#fff" }}
+              style={{ background: '#FF6F00', color: '#fff' }}
             >
-              ⚠ {lockedCount} gear{lockedCount > 1 ? "s" : ""} locked!
+              ⚠ {lockedCount} gear{lockedCount > 1 ? 's' : ''} locked!
             </span>
           )}
-          {mode === "test" && testWon && (
+          {mode === 'test' && testWon && (
             <span
               className="text-xs px-2 py-0.5 rounded font-bold"
-              style={{ background: "#388E3C", color: "#fff" }}
+              style={{ background: '#388E3C', color: '#fff' }}
             >
               ✓ Win condition met!
             </span>
           )}
+          <button
+            onClick={resetView}
+            className="px-2 py-0.5 rounded text-xs cursor-pointer"
+            style={{ background: '#5D4037', color: '#D7CCC8', border: '1px solid #795548' }}
+          >
+            {Math.round(zoom * 100)}% ↺
+          </button>
         </div>
 
         <div className="flex-1" />
 
-        {mode === "edit" && (
+        {mode === 'edit' && (
           <>
             <button
               onClick={startTest}
@@ -496,57 +560,258 @@ export default function LevelEditor({
               &#9654; Test
             </button>
             <button
-              onClick={handleSave}
+              onClick={() => void handleSave()}
               className="px-3 py-1.5 rounded font-bold text-sm cursor-pointer"
               style={{
-                background: "linear-gradient(to bottom, #66BB6A, #388E3C)",
-                color: "#fff",
-                border: "1px solid #4CAF50",
+                background: 'linear-gradient(to bottom, #66BB6A, #388E3C)',
+                color: '#fff',
+                border: '1px solid #4CAF50',
               }}
             >
-              Save Level
+              Save Draft
             </button>
           </>
         )}
-        {mode === "test" && (
-          <button
-            onClick={stopTest}
-            className="px-3 py-1.5 rounded font-bold text-sm cursor-pointer"
-            style={{
-              background: "linear-gradient(to bottom, #EF5350, #C62828)",
-              color: "#fff",
-              border: "1px solid #E53935",
-            }}
-          >
-            &#9632; Stop Test
-          </button>
+        {mode === 'test' && (
+          <>
+            <button
+              onClick={stopTest}
+              className="px-3 py-1.5 rounded font-bold text-sm cursor-pointer"
+              style={{
+                background: 'linear-gradient(to bottom, #EF5350, #C62828)',
+                color: '#fff',
+                border: '1px solid #E53935',
+              }}
+            >
+              &#9632; Stop Test
+            </button>
+            {testWon && (
+              <>
+                <button
+                  onClick={() => void handlePublish()}
+                  disabled={publishing}
+                  className="px-3 py-1.5 rounded font-bold text-sm cursor-pointer"
+                  style={{
+                    background: 'linear-gradient(to bottom, #FFD54F, #FF8F00)',
+                    color: '#3E2723',
+                    border: '1px solid #FFB300',
+                    opacity: publishing ? 0.5 : 1,
+                  }}
+                >
+                  {publishing ? 'Publishing...' : '🚀 Publish'}
+                </button>
+                {isDailyMode && (
+                  <button
+                    onClick={() => void handlePublishDaily()}
+                    disabled={publishing}
+                    className="px-3 py-1.5 rounded font-bold text-sm cursor-pointer"
+                    style={{
+                      background: 'linear-gradient(to bottom, #AB47BC, #7B1FA2)',
+                      color: '#fff',
+                      border: '1px solid #9C27B0',
+                      opacity: publishing ? 0.5 : 1,
+                    }}
+                  >
+                    Post Daily
+                  </button>
+                )}
+              </>
+            )}
+          </>
         )}
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Side panel */}
+      <div className="flex flex-col flex-1 overflow-hidden">
+        {/* Board */}
         <div
-          className="flex flex-col gap-3 p-3 shrink-0 overflow-y-auto"
+          ref={boardRef}
+          className="flex-1 relative overflow-hidden"
           style={{
-            width: 180,
-            background: "linear-gradient(to right, #3E2723, #4E342E)",
-            borderRight: "2px solid #5D4037",
+            background: 'radial-gradient(ellipse at center, #4E342E 0%, #2C1810 70%)',
+            cursor: mode === 'edit' && placingRole ? 'copy' : 'crosshair',
+          }}
+          onClick={handleBoardClick}
+          onWheel={handleWheel}
+          onPointerDown={(e) => {
+            if (!dragging && !placingRole) {
+              pzPointerDown(e);
+            }
+          }}
+          onPointerMove={(e) => {
+            if (dragging) {
+              handlePointerMove(e);
+            } else {
+              pzPointerMove(e);
+            }
+          }}
+          onPointerUp={(e) => {
+            pzPointerUp(e);
+            handlePointerUp();
+          }}
+          onPointerLeave={(e) => {
+            pzPointerUp(e);
+            handlePointerUp();
           }}
         >
-          {mode === "edit" && (
-            <>
-              {/* Place gear tools */}
-              <div
-                className="text-xs font-bold uppercase"
-                style={{ color: "#A1887F" }}
-              >
-                Place Gears
-              </div>
+          {/* Transformed canvas layer */}
+          <div
+            className="absolute"
+            style={{
+              transform: canvasTransform,
+              transformOrigin: '0 0',
+              width: 2400,
+              height: 1600,
+            }}
+          >
+            {/* Grid */}
+            <svg
+              className="absolute inset-0 pointer-events-none"
+              width={2400}
+              height={1600}
+              style={{ opacity: 0.06 }}
+            >
+              <defs>
+                <pattern id="editorGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+                  <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#D7CCC8" strokeWidth="1" />
+                </pattern>
+              </defs>
+              <rect width="100%" height="100%" fill="url(#editorGrid)" />
+            </svg>
 
-              <div className="text-xs" style={{ color: "#8D6E63" }}>
-                Size:
+            {/* Gears */}
+            {gears.map((gear) => {
+              const isDraggable =
+                mode === 'edit' || (mode === 'test' && gear.role === 'positional');
+              return (
+                <div
+                  key={gear.id}
+                  className="absolute"
+                  style={{
+                    left: gear.position.x,
+                    top: gear.position.y,
+                    cursor: isDraggable ? 'grab' : 'default',
+                  }}
+                  onPointerDown={(e) => {
+                    if (isDraggable && !placingRole) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleBoardGearDragStart(gear, e.clientX, e.clientY);
+                    }
+                  }}
+                  onContextMenu={(e) => handleGearRightClick(e, gear)}
+                >
+                  <GearSVG
+                    size={gear.size}
+                    role={gear.role}
+                    angle={gear.angle}
+                    locked={gear.locked}
+                    requiredDirection={gear.requiredDirection}
+                  />
+                </div>
+              );
+            })}
+
+            {/* Snap ghost */}
+            {dragging?.snapTarget && (
+              <div
+                className="absolute pointer-events-none"
+                style={{
+                  left: dragging.snapTarget.position.x - GEAR_DIMENSIONS[dragging.size].outerRadius,
+                  top: dragging.snapTarget.position.y - GEAR_DIMENSIONS[dragging.size].outerRadius,
+                }}
+              >
+                <GearSVG
+                  size={dragging.size}
+                  role={
+                    dragging.isFixedGearDrag ? dragging.originalRole || 'positional' : 'positional'
+                  }
+                  angle={0}
+                  opacity={0.4}
+                  highlight
+                  requiredDirection={dragging.originalDirection}
+                />
               </div>
-              <div className="flex flex-wrap gap-1">
+            )}
+
+            {/* Drag ghost */}
+            {dragging && (
+              <div
+                className="absolute pointer-events-none"
+                style={{
+                  left: dragging.currentPos.x,
+                  top: dragging.currentPos.y,
+                  opacity: dragging.snapTarget ? 0.3 : 0.7,
+                }}
+              >
+                <GearSVG
+                  size={dragging.size}
+                  role={
+                    dragging.isFixedGearDrag ? dragging.originalRole || 'positional' : 'positional'
+                  }
+                  angle={0}
+                  requiredDirection={dragging.originalDirection}
+                />
+              </div>
+            )}
+          </div>
+          {/* end transformed canvas */}
+        </div>
+
+        {/* Bottom tools panel */}
+        <div
+          className="shrink-0 overflow-y-auto"
+          style={{
+            maxHeight: '40vh',
+            background: 'linear-gradient(to top, #3E2723, #4E342E)',
+            borderTop: '2px solid #5D4037',
+          }}
+        >
+          {/* Draggable inventory tray — horizontal row */}
+          <div
+            className="flex items-center gap-2 px-3 py-2 overflow-x-auto"
+            style={{ borderBottom: '1px solid #5D4037' }}
+          >
+            <div
+              className="text-xs font-bold uppercase whitespace-nowrap shrink-0"
+              style={{ color: '#A1887F' }}
+            >
+              {mode === 'edit' ? 'Preview' : 'Inventory'}
+            </div>
+            {sidebarInventory.length === 0 && (
+              <div className="text-xs whitespace-nowrap" style={{ color: '#795548' }}>
+                {mode === 'edit' ? 'All inventory gears placed!' : 'All gears placed!'}
+              </div>
+            )}
+            {sidebarInventory.map((item) => (
+              <div
+                key={item.id}
+                className="cursor-grab active:cursor-grabbing p-1 rounded shrink-0"
+                style={{
+                  border: '1px dashed #5D4037',
+                  background: 'rgba(93,64,55,0.2)',
+                  transform: 'scale(0.6)',
+                  transformOrigin: 'center',
+                }}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  handleInventoryDragStart(item, e.clientX, e.clientY);
+                }}
+              >
+                <GearSVG size={item.size} role="positional" angle={0} />
+              </div>
+            ))}
+          </div>
+
+          {mode === 'edit' && (
+            <div className="flex flex-col gap-2 p-3">
+              {/* Place gear tools — in horizontal rows */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <div
+                  className="text-xs font-bold uppercase whitespace-nowrap"
+                  style={{ color: '#A1887F' }}
+                >
+                  Size:
+                </div>
                 {GEAR_SIZES.map((s) => (
                   <button
                     key={s}
@@ -559,34 +824,27 @@ export default function LevelEditor({
                 ))}
               </div>
 
-              <div className="text-xs mt-2" style={{ color: "#8D6E63" }}>
-                Click board to place:
-              </div>
-              <button
-                onClick={() =>
-                  setPlacingRole(placingRole === "start" ? null : "start")
-                }
-                className="px-3 py-2 rounded font-bold text-sm cursor-pointer w-full"
-                style={btnStyle(placingRole === "start")}
-              >
-                ▶ Start ({gears.filter((g) => g.role === "start").length}/5)
-              </button>
-              <button
-                onClick={() =>
-                  setPlacingRole(placingRole === "goal" ? null : "goal")
-                }
-                className="px-3 py-2 rounded font-bold text-sm cursor-pointer w-full"
-                style={btnStyle(placingRole === "goal")}
-              >
-                ■ Goal ({gears.filter((g) => g.role === "goal").length}/2)
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="text-xs whitespace-nowrap" style={{ color: '#8D6E63' }}>
+                  Click board to place:
+                </div>
+                <button
+                  onClick={() => setPlacingRole(placingRole === 'start' ? null : 'start')}
+                  className="px-3 py-1.5 rounded font-bold text-xs cursor-pointer"
+                  style={btnStyle(placingRole === 'start')}
+                >
+                  ▶ Start ({gears.filter((g) => g.role === 'start').length}/5)
+                </button>
+                <button
+                  onClick={() => setPlacingRole(placingRole === 'goal' ? null : 'goal')}
+                  className="px-3 py-1.5 rounded font-bold text-xs cursor-pointer"
+                  style={btnStyle(placingRole === 'goal')}
+                >
+                  ■ Goal ({gears.filter((g) => g.role === 'goal').length}/2)
+                </button>
 
-              {placingRole === "goal" && (
-                <div className="flex flex-col gap-1">
-                  <div className="text-xs" style={{ color: "#8D6E63" }}>
-                    Required direction:
-                  </div>
-                  {DIRECTION_OPTIONS.map((opt) => (
+                {placingRole === 'goal' &&
+                  DIRECTION_OPTIONS.map((opt) => (
                     <button
                       key={opt.value}
                       onClick={() => setPlacingDirection(opt.value)}
@@ -596,20 +854,16 @@ export default function LevelEditor({
                       {opt.label}
                     </button>
                   ))}
-                </div>
-              )}
+              </div>
 
-              {/* Inventory definition */}
-              <div
-                className="text-xs font-bold uppercase mt-4"
-                style={{ color: "#A1887F" }}
-              >
-                Player Inventory
-              </div>
-              <div className="text-xs" style={{ color: "#8D6E63" }}>
-                Add gears for the player:
-              </div>
-              <div className="flex flex-wrap gap-1">
+              {/* Inventory definition — horizontal row */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <div
+                  className="text-xs font-bold uppercase whitespace-nowrap"
+                  style={{ color: '#A1887F' }}
+                >
+                  Player Inventory:
+                </div>
                 {GEAR_SIZES.map((s) => (
                   <button
                     key={s}
@@ -621,26 +875,27 @@ export default function LevelEditor({
                   </button>
                 ))}
               </div>
+
               {inventoryDef.length > 0 && (
-                <div className="flex flex-col gap-1 mt-1">
+                <div className="flex items-center gap-1 flex-wrap">
                   {inventoryDef.map((item) => (
                     <div
                       key={item.id}
-                      className="flex items-center justify-between px-2 py-1 rounded text-xs capitalize"
+                      className="flex items-center gap-1 px-2 py-0.5 rounded text-xs capitalize"
                       style={{
                         background: editPlacedInventory.includes(item.id)
-                          ? "rgba(76,175,80,0.2)"
-                          : "rgba(93,64,55,0.3)",
-                        color: "#D7CCC8",
+                          ? 'rgba(76,175,80,0.2)'
+                          : 'rgba(93,64,55,0.3)',
+                        color: '#D7CCC8',
                         border: editPlacedInventory.includes(item.id)
-                          ? "1px solid #4CAF50"
-                          : "none",
+                          ? '1px solid #4CAF50'
+                          : 'none',
                       }}
                     >
                       <span>
                         {item.size}
                         {editPlacedInventory.includes(item.id) && (
-                          <span style={{ color: "#66BB6A" }}> ✓</span>
+                          <span style={{ color: '#66BB6A' }}> ✓</span>
                         )}
                       </span>
                       <button
@@ -653,166 +908,10 @@ export default function LevelEditor({
                   ))}
                 </div>
               )}
-            </>
-          )}
 
-          {/* Draggable inventory tray — shown in BOTH modes */}
-          <div
-            className="text-xs font-bold uppercase mt-3"
-            style={{ color: "#A1887F" }}
-          >
-            {mode === "edit" ? "Preview: Drag to Board" : "Test Inventory"}
-          </div>
-          {sidebarInventory.length === 0 && (
-            <div className="text-xs" style={{ color: "#795548" }}>
-              {mode === "edit"
-                ? "All inventory gears placed!"
-                : "All gears placed!"}
-            </div>
-          )}
-          {sidebarInventory.map((item) => (
-            <div
-              key={item.id}
-              className="cursor-grab active:cursor-grabbing p-1 rounded"
-              style={{
-                border: "1px dashed #5D4037",
-                background: "rgba(93,64,55,0.2)",
-              }}
-              onPointerDown={(e) => {
-                e.preventDefault();
-                handleInventoryDragStart(item, e.clientX, e.clientY);
-              }}
-            >
-              <GearSVG size={item.size} role="positional" angle={0} />
-            </div>
-          ))}
-
-          {mode === "edit" && (
-            <div className="text-xs mt-3 italic" style={{ color: "#795548" }}>
-              Drag gears on board to reposition. Right-click to remove.
-            </div>
-          )}
-        </div>
-
-        {/* Board */}
-        <div
-          ref={boardRef}
-          className="flex-1 relative overflow-hidden"
-          style={{
-            background:
-              "radial-gradient(ellipse at center, #4E342E 0%, #2C1810 70%)",
-            cursor: mode === "edit" && placingRole ? "copy" : "crosshair",
-          }}
-          onClick={handleBoardClick}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerLeave={handlePointerUp}
-        >
-          {/* Grid */}
-          <svg
-            className="absolute inset-0 w-full h-full pointer-events-none"
-            style={{ opacity: 0.06 }}
-          >
-            <defs>
-              <pattern
-                id="editorGrid"
-                width="40"
-                height="40"
-                patternUnits="userSpaceOnUse"
-              >
-                <path
-                  d="M 40 0 L 0 0 0 40"
-                  fill="none"
-                  stroke="#D7CCC8"
-                  strokeWidth="1"
-                />
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#editorGrid)" />
-          </svg>
-
-          {/* Gears */}
-          {gears.map((gear) => {
-            const isDraggable =
-              mode === "edit" ||
-              (mode === "test" && gear.role === "positional");
-            return (
-              <div
-                key={gear.id}
-                className="absolute"
-                style={{
-                  left: gear.position.x,
-                  top: gear.position.y,
-                  cursor: isDraggable ? "grab" : "default",
-                }}
-                onPointerDown={(e) => {
-                  if (isDraggable && !placingRole) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleBoardGearDragStart(gear, e.clientX, e.clientY);
-                  }
-                }}
-                onContextMenu={(e) => handleGearRightClick(e, gear)}
-              >
-                <GearSVG
-                  size={gear.size}
-                  role={gear.role}
-                  angle={gear.angle}
-                  locked={gear.locked}
-                  requiredDirection={gear.requiredDirection}
-                />
+              <div className="text-xs italic" style={{ color: '#795548' }}>
+                Drag gears on board to reposition · Right-click to remove
               </div>
-            );
-          })}
-
-          {/* Snap ghost */}
-          {dragging?.snapTarget && (
-            <div
-              className="absolute pointer-events-none"
-              style={{
-                left:
-                  dragging.snapTarget.position.x -
-                  GEAR_DIMENSIONS[dragging.size].outerRadius,
-                top:
-                  dragging.snapTarget.position.y -
-                  GEAR_DIMENSIONS[dragging.size].outerRadius,
-              }}
-            >
-              <GearSVG
-                size={dragging.size}
-                role={
-                  dragging.isFixedGearDrag
-                    ? dragging.originalRole || "positional"
-                    : "positional"
-                }
-                angle={0}
-                opacity={0.4}
-                highlight
-                requiredDirection={dragging.originalDirection}
-              />
-            </div>
-          )}
-
-          {/* Drag ghost */}
-          {dragging && (
-            <div
-              className="absolute pointer-events-none"
-              style={{
-                left: dragging.currentPos.x,
-                top: dragging.currentPos.y,
-                opacity: dragging.snapTarget ? 0.3 : 0.7,
-              }}
-            >
-              <GearSVG
-                size={dragging.size}
-                role={
-                  dragging.isFixedGearDrag
-                    ? dragging.originalRole || "positional"
-                    : "positional"
-                }
-                angle={0}
-                requiredDirection={dragging.originalDirection}
-              />
             </div>
           )}
         </div>

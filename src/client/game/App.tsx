@@ -3,7 +3,7 @@ import HomePage from '../components/Home/HomePage';
 import PlayPage from '../components/Play/PlayPage';
 import EditorPage from '../components/Editor/EditorPage';
 import HistoryPage from '../components/History/HistoryPage';
-import CommunityPage from '../components/Community/CommunityPage';
+import MyLevelsPage from '../components/MyLevels/MyLevelsPage';
 
 export default function App() {
   return (
@@ -14,7 +14,7 @@ export default function App() {
         <Route path="/play/:levelId" element={<PlayPage />} />
         <Route path="/editor" element={<EditorPage />} />
         <Route path="/history" element={<HistoryPage />} />
-        <Route path="/community" element={<CommunityPage />} />
+        <Route path="/my-levels" element={<MyLevelsPage />} />
       </Routes>
     </HashRouter>
   );

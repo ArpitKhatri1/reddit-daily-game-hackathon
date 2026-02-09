@@ -10,6 +10,8 @@
 
     "outDir": "../../dist/types/server",
 
+    "exactOptionalPropertyTypes": false,
+
     "tsBuildInfoFile": "../../dist/tsconfig.tsbuildinfo"
   },
   // https://github.com/Microsoft/TypeScript/issues/25636

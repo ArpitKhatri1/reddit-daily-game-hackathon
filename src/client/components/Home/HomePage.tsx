@@ -1,10 +1,19 @@
-import { useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
-import GearSVG from "../Gear/GearSVG";
+import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { fetchIsAdmin } from '../../lib/api';
+import GearSVG from '../Gear/GearSVG';
 
 export default function HomePage() {
   const navigate = useNavigate();
   const [heroAngle, setHeroAngle] = useState(0);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Check admin status
+  useEffect(() => {
+    fetchIsAdmin()
+      .then((r) => setIsAdmin(r.isAdmin))
+      .catch(() => {});
+  }, []);
 
   // Animate hero gears
   useEffect(() => {
@@ -21,15 +30,11 @@ export default function HomePage() {
     <div
       className="flex flex-col items-center justify-center h-screen w-screen relative overflow-hidden"
       style={{
-        background:
-          "radial-gradient(ellipse at center, #4E342E 0%, #2C1810 50%, #1a0f0a 100%)",
+        background: 'radial-gradient(ellipse at center, #4E342E 0%, #2C1810 50%, #1a0f0a 100%)',
       }}
     >
       {/* Decorative background gears */}
-      <div
-        className="absolute pointer-events-none"
-        style={{ top: -60, left: -40, opacity: 0.08 }}
-      >
+      <div className="absolute pointer-events-none" style={{ top: -60, left: -40, opacity: 0.08 }}>
         <GearSVG size="extraLarge" role="positional" angle={heroAngle * 0.5} />
       </div>
       <div
@@ -38,101 +43,111 @@ export default function HomePage() {
       >
         <GearSVG size="extraLarge" role="positional" angle={-heroAngle * 0.3} />
       </div>
-      <div
-        className="absolute pointer-events-none"
-        style={{ top: 100, right: 80, opacity: 0.06 }}
-      >
+      <div className="absolute pointer-events-none" style={{ top: 100, right: 80, opacity: 0.06 }}>
         <GearSVG size="large" role="positional" angle={heroAngle * 0.7} />
       </div>
 
       {/* Title section */}
       <div className="flex items-center gap-4 mb-2">
-        <div style={{ transform: "scale(0.7)" }}>
+        <div style={{ transform: 'scale(0.7)' }}>
           <GearSVG size="medium" role="start" angle={heroAngle} />
         </div>
         <h1
           className="text-5xl md:text-6xl font-bold"
           style={{
-            color: "#FFD54F",
-            fontFamily: "Georgia, serif",
-            textShadow: "0 3px 12px rgba(255,213,79,0.4)",
+            color: '#FFD54F',
+            fontFamily: 'Georgia, serif',
+            textShadow: '0 3px 12px rgba(255,213,79,0.4)',
           }}
         >
           Gear Puzzle
         </h1>
-        <div style={{ transform: "scale(0.7)" }}>
+        <div style={{ transform: 'scale(0.7)' }}>
           <GearSVG size="medium" role="goal" angle={-heroAngle} />
         </div>
       </div>
 
-      <p
-        className="text-lg mb-10"
-        style={{ color: "#A1887F", fontFamily: "Georgia, serif" }}
-      >
+      <p className="text-lg mb-10" style={{ color: '#A1887F', fontFamily: 'Georgia, serif' }}>
         Connect the gears. Open the door.
       </p>
 
       {/* Menu buttons */}
       <div className="flex flex-col gap-4 w-72">
         <button
-          onClick={() => navigate("/play")}
+          onClick={() => navigate('/play')}
           className="px-6 py-4 rounded-lg font-bold text-lg cursor-pointer transition-all hover:scale-105"
           style={{
-            background: "linear-gradient(to bottom, #FFD54F, #FF8F00)",
-            color: "#3E2723",
-            border: "2px solid #FFB300",
-            boxShadow: "0 4px 16px rgba(255,183,0,0.3)",
-            fontFamily: "Georgia, serif",
+            background: 'linear-gradient(to bottom, #FFD54F, #FF8F00)',
+            color: '#3E2723',
+            border: '2px solid #FFB300',
+            boxShadow: '0 4px 16px rgba(255,183,0,0.3)',
+            fontFamily: 'Georgia, serif',
           }}
         >
           &#9654;&ensp;Daily Puzzle
         </button>
 
         <button
-          onClick={() => navigate("/editor")}
+          onClick={() => navigate('/editor')}
           className="px-6 py-4 rounded-lg font-bold text-lg cursor-pointer transition-all hover:scale-105"
           style={{
-            background: "linear-gradient(to bottom, #66BB6A, #388E3C)",
-            color: "#fff",
-            border: "2px solid #4CAF50",
-            boxShadow: "0 4px 16px rgba(76,175,80,0.3)",
-            fontFamily: "Georgia, serif",
+            background: 'linear-gradient(to bottom, #66BB6A, #388E3C)',
+            color: '#fff',
+            border: '2px solid #4CAF50',
+            boxShadow: '0 4px 16px rgba(76,175,80,0.3)',
+            fontFamily: 'Georgia, serif',
           }}
         >
           &#9881;&ensp;Level Editor
         </button>
 
         <button
-          onClick={() => navigate("/community")}
+          onClick={() => navigate('/my-levels')}
           className="px-6 py-4 rounded-lg font-bold text-lg cursor-pointer transition-all hover:scale-105"
           style={{
-            background: "linear-gradient(to bottom, #FF8F00, #E65100)",
-            color: "#fff",
-            border: "2px solid #FF6F00",
-            boxShadow: "0 4px 16px rgba(255,111,0,0.3)",
-            fontFamily: "Georgia, serif",
+            background: 'linear-gradient(to bottom, #FF8F00, #E65100)',
+            color: '#fff',
+            border: '2px solid #FF6F00',
+            boxShadow: '0 4px 16px rgba(255,111,0,0.3)',
+            fontFamily: 'Georgia, serif',
           }}
         >
-          &#127760;&ensp;Community Levels
+          &#128736;&ensp;Your Levels
         </button>
 
         <button
-          onClick={() => navigate("/history")}
+          onClick={() => navigate('/history')}
           className="px-6 py-4 rounded-lg font-bold text-lg cursor-pointer transition-all hover:scale-105"
           style={{
-            background: "linear-gradient(to bottom, #5D4037, #3E2723)",
-            color: "#D7CCC8",
-            border: "2px solid #795548",
-            boxShadow: "0 4px 16px rgba(93,64,55,0.3)",
-            fontFamily: "Georgia, serif",
+            background: 'linear-gradient(to bottom, #5D4037, #3E2723)',
+            color: '#D7CCC8',
+            border: '2px solid #795548',
+            boxShadow: '0 4px 16px rgba(93,64,55,0.3)',
+            fontFamily: 'Georgia, serif',
           }}
         >
           &#128214;&ensp;History
         </button>
+
+        {isAdmin && (
+          <button
+            onClick={() => navigate('/editor?mode=daily')}
+            className="px-6 py-4 rounded-lg font-bold text-lg cursor-pointer transition-all hover:scale-105"
+            style={{
+              background: 'linear-gradient(to bottom, #AB47BC, #7B1FA2)',
+              color: '#fff',
+              border: '2px solid #9C27B0',
+              boxShadow: '0 4px 16px rgba(156,39,176,0.3)',
+              fontFamily: 'Georgia, serif',
+            }}
+          >
+            &#9733;&ensp;Post Daily Puzzle
+          </button>
+        )}
       </div>
 
       {/* Footer */}
-      <div className="absolute bottom-4 text-xs" style={{ color: "#5D4037" }}>
+      <div className="absolute bottom-4 text-xs" style={{ color: '#5D4037' }}>
         A calm, precision-based gear puzzle
       </div>
     </div>

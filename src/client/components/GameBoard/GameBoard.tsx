@@ -1,26 +1,36 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type {
   GearInstance,
   GearInventoryItem,
   GearSize,
   LevelDefinition,
   Position,
-} from "../../types";
-import { GEAR_DIMENSIONS, SNAP_TOLERANCE } from "../../lib/constants";
+} from '../../types';
+import type { LeaderboardEntry } from '../../../shared/types/api';
+import { GEAR_DIMENSIONS, SNAP_TOLERANCE } from '../../lib/constants';
 import {
   findSnapTarget,
   propagateRotation,
   checkWinCondition,
   initializeStartGears,
-} from "../../lib/engine";
-import GearSVG from "../Gear/GearSVG";
-import InventoryTray from "./InventoryTray";
-import WinOverlay from "./WinOverlay";
+} from '../../lib/engine';
+import { usePanZoom } from '../../hooks/usePanZoom';
+import GearSVG from '../Gear/GearSVG';
+import InventoryTray from './InventoryTray';
+import WinOverlay from './WinOverlay';
 
 interface GameBoardProps {
   level: LevelDefinition;
   onWin: (timeTakenMs: number) => void;
   onBack: () => void;
+  leaderboard?: LeaderboardEntry[];
+  leaderboardActive?: boolean;
+  solveResult?: {
+    leaderboard: LeaderboardEntry[];
+    rank?: number;
+    message?: string;
+  };
+  currentUser?: string;
 }
 
 function formatElapsed(ms: number): string {
@@ -28,14 +38,24 @@ function formatElapsed(ms: number): string {
   const min = Math.floor(totalSec / 60);
   const sec = totalSec % 60;
   return min > 0
-    ? `${min}:${sec.toString().padStart(2, "0")}`
-    : `0:${sec.toString().padStart(2, "0")}`;
+    ? `${min}:${sec.toString().padStart(2, '0')}`
+    : `0:${sec.toString().padStart(2, '0')}`;
 }
 
-export default function GameBoard({ level, onWin, onBack }: GameBoardProps) {
+export default function GameBoard({
+  level,
+  onWin,
+  onBack,
+  leaderboard,
+  leaderboardActive,
+  solveResult,
+  currentUser,
+}: GameBoardProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   const animFrameRef = useRef<number>(0);
   const startTimeRef = useRef<number>(0);
+
+  const panZoom = usePanZoom({ minZoom: 0.3, maxZoom: 2.0 });
 
   const [gears, setGears] = useState<GearInstance[]>([]);
   const [inventory, setInventory] = useState<GearInventoryItem[]>([]);
@@ -79,7 +99,7 @@ export default function GameBoard({ level, onWin, onBack }: GameBoardProps) {
             return { ...g, angle: (g.angle + jitter * 0.1) % 360 };
           }
           return { ...g, angle: (g.angle + g.rotationSpeed) % 360 };
-        }),
+        })
       );
       animFrameRef.current = requestAnimationFrame(animate);
     };
@@ -106,17 +126,30 @@ export default function GameBoard({ level, onWin, onBack }: GameBoardProps) {
     }
   }, [gears, won, onWin]);
 
+  const {
+    clientToCanvas,
+    canvasTransform,
+    handleWheel,
+    handlePointerDown: pzPointerDown,
+    handlePointerMove: pzPointerMove,
+    handlePointerUp: pzPointerUp,
+    cancelPan,
+    zoom,
+    resetView,
+  } = panZoom;
+
   const getBoardPos = useCallback(
     (clientX: number, clientY: number): Position => {
       if (!boardRef.current) return { x: clientX, y: clientY };
       const rect = boardRef.current.getBoundingClientRect();
-      return { x: clientX - rect.left, y: clientY - rect.top };
+      return clientToCanvas(clientX, clientY, rect);
     },
-    [],
+    [clientToCanvas]
   );
 
   const handleInventoryDragStart = useCallback(
     (item: GearInventoryItem, clientX: number, clientY: number) => {
+      cancelPan();
       const pos = getBoardPos(clientX, clientY);
       const dim = GEAR_DIMENSIONS[item.size];
       setDragging({
@@ -130,12 +163,13 @@ export default function GameBoard({ level, onWin, onBack }: GameBoardProps) {
         snapTarget: null,
       });
     },
-    [getBoardPos],
+    [getBoardPos, cancelPan]
   );
 
   const handleBoardGearDragStart = useCallback(
     (gear: GearInstance, clientX: number, clientY: number) => {
-      if (gear.role !== "positional") return;
+      if (gear.role !== 'positional') return;
+      cancelPan();
       const pos = getBoardPos(clientX, clientY);
 
       setGears((prev) => {
@@ -154,7 +188,7 @@ export default function GameBoard({ level, onWin, onBack }: GameBoardProps) {
         snapTarget: null,
       });
     },
-    [getBoardPos],
+    [getBoardPos, cancelPan]
   );
 
   const handlePointerMove = useCallback(
@@ -174,16 +208,14 @@ export default function GameBoard({ level, onWin, onBack }: GameBoardProps) {
       const snap = findSnapTarget(
         centerPos,
         dragging.size,
-        dragging.gearId || dragging.inventoryId || "",
+        dragging.gearId || dragging.inventoryId || '',
         gears,
-        SNAP_TOLERANCE,
+        SNAP_TOLERANCE
       );
 
-      setDragging((prev) =>
-        prev ? { ...prev, currentPos: gearPos, snapTarget: snap } : null,
-      );
+      setDragging((prev) => (prev ? { ...prev, currentPos: gearPos, snapTarget: snap } : null));
     },
-    [dragging, gears, getBoardPos],
+    [dragging, gears, getBoardPos]
   );
 
   const handlePointerUp = useCallback(() => {
@@ -199,11 +231,8 @@ export default function GameBoard({ level, onWin, onBack }: GameBoardProps) {
       : { x: dragging.currentPos.x, y: dragging.currentPos.y };
 
     const newGear: GearInstance = {
-      id:
-        dragging.gearId ||
-        dragging.inventoryId ||
-        "gear-" + Date.now().toString(),
-      role: "positional",
+      id: dragging.gearId || dragging.inventoryId || 'gear-' + Date.now().toString(),
+      role: 'positional',
       size: dragging.size,
       position: placementPos,
       angle: 0,
@@ -212,42 +241,31 @@ export default function GameBoard({ level, onWin, onBack }: GameBoardProps) {
     };
 
     if (dragging.inventoryId) {
-      setInventory((prev) =>
-        prev.filter((item) => item.id !== dragging.inventoryId),
-      );
+      setInventory((prev) => prev.filter((item) => item.id !== dragging.inventoryId));
     }
     setGears((prev) => propagateRotation([...prev, newGear]));
     setDragging(null);
   }, [dragging]);
 
-  const handleGearContextMenu = useCallback(
-    (e: React.MouseEvent, gear: GearInstance) => {
-      e.preventDefault();
-      if (gear.role !== "positional") return;
-      setGears((prev) => {
-        const filtered = prev.filter((g) => g.id !== gear.id);
-        return propagateRotation(filtered);
-      });
-      setInventory((prev) => [...prev, { id: gear.id, size: gear.size }]);
-    },
-    [],
-  );
+  const handleGearContextMenu = useCallback((e: React.MouseEvent, gear: GearInstance) => {
+    e.preventDefault();
+    if (gear.role !== 'positional') return;
+    setGears((prev) => {
+      const filtered = prev.filter((g) => g.id !== gear.id);
+      return propagateRotation(filtered);
+    });
+    setInventory((prev) => [...prev, { id: gear.id, size: gear.size }]);
+  }, []);
 
   return (
-    <div
-      className="flex flex-col h-screen w-screen"
-      style={{ background: "#2C1810" }}
-    >
+    <div className="flex flex-col h-screen w-screen" style={{ background: '#2C1810' }}>
       {/* Elapsed timer bar */}
       {!won && (
         <div
           className="flex items-center justify-center py-1 shrink-0"
-          style={{ background: "#1a0f0a" }}
+          style={{ background: '#1a0f0a' }}
         >
-          <span
-            className="text-sm font-mono font-bold tracking-wider"
-            style={{ color: "#FFD54F" }}
-          >
+          <span className="text-sm font-mono font-bold tracking-wider" style={{ color: '#FFD54F' }}>
             ⏱ {formatElapsed(elapsed)}
           </span>
         </div>
@@ -257,136 +275,166 @@ export default function GameBoard({ level, onWin, onBack }: GameBoardProps) {
       <div
         className="flex items-center justify-between px-6 py-3 shrink-0"
         style={{
-          background: "linear-gradient(to bottom, #3E2723, #2C1810)",
-          borderBottom: "2px solid #5D4037",
+          background: 'linear-gradient(to bottom, #3E2723, #2C1810)',
+          borderBottom: '2px solid #5D4037',
         }}
       >
         <button
           onClick={onBack}
           className="px-4 py-2 rounded font-bold text-sm cursor-pointer"
           style={{
-            background: "#5D4037",
-            color: "#D7CCC8",
-            border: "1px solid #795548",
+            background: '#5D4037',
+            color: '#D7CCC8',
+            border: '1px solid #795548',
           }}
         >
           &larr; Back
         </button>
         <h2
           className="text-lg font-bold"
-          style={{ color: "#D7CCC8", fontFamily: "Georgia, serif" }}
+          style={{ color: '#D7CCC8', fontFamily: 'Georgia, serif' }}
         >
           {level.name}
         </h2>
-        <div className="text-xs" style={{ color: "#A1887F" }}>
-          Drag to place · Right-click to remove
+        <div className="flex items-center gap-2">
+          <button
+            onClick={resetView}
+            className="px-2 py-1 rounded text-xs cursor-pointer"
+            style={{ background: '#5D4037', color: '#D7CCC8', border: '1px solid #795548' }}
+          >
+            Reset View
+          </button>
+          <span className="text-xs" style={{ color: '#A1887F' }}>
+            {Math.round(zoom * 100)}%
+          </span>
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        <InventoryTray
-          items={inventory}
-          onDragStart={handleInventoryDragStart}
-        />
-
+      <div className="flex flex-col flex-1 overflow-hidden">
         <div
           ref={boardRef}
           className="flex-1 relative overflow-hidden cursor-crosshair"
           style={{
-            background:
-              "radial-gradient(ellipse at center, #4E342E 0%, #2C1810 70%)",
+            background: 'radial-gradient(ellipse at center, #4E342E 0%, #2C1810 70%)',
           }}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerLeave={handlePointerUp}
+          onWheel={handleWheel}
+          onPointerDown={(e) => {
+            // Only start pan if not dragging a gear
+            if (!dragging) {
+              pzPointerDown(e);
+            }
+          }}
+          onPointerMove={(e) => {
+            if (dragging) {
+              handlePointerMove(e);
+            } else {
+              pzPointerMove(e);
+            }
+          }}
+          onPointerUp={(e) => {
+            pzPointerUp(e);
+            handlePointerUp();
+          }}
+          onPointerLeave={(e) => {
+            pzPointerUp(e);
+            handlePointerUp();
+          }}
         >
-          <svg
-            className="absolute inset-0 w-full h-full pointer-events-none"
-            style={{ opacity: 0.06 }}
+          {/* Transformed canvas layer */}
+          <div
+            className="absolute"
+            style={{
+              transform: canvasTransform,
+              transformOrigin: '0 0',
+              width: 2400,
+              height: 1600,
+            }}
           >
-            <defs>
-              <pattern
-                id="grid"
-                width="40"
-                height="40"
-                patternUnits="userSpaceOnUse"
+            <svg
+              className="absolute inset-0 pointer-events-none"
+              width={2400}
+              height={1600}
+              style={{ opacity: 0.06 }}
+            >
+              <defs>
+                <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                  <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#D7CCC8" strokeWidth="1" />
+                </pattern>
+              </defs>
+              <rect width="100%" height="100%" fill="url(#grid)" />
+            </svg>
+
+            {gears.map((gear) => (
+              <div
+                key={gear.id}
+                className="absolute"
+                style={{
+                  left: gear.position.x,
+                  top: gear.position.y,
+                  cursor: gear.role === 'positional' ? 'grab' : 'default',
+                }}
+                onPointerDown={(e) => {
+                  if (gear.role === 'positional') {
+                    e.preventDefault();
+                    handleBoardGearDragStart(gear, e.clientX, e.clientY);
+                  }
+                }}
+                onContextMenu={(e) => handleGearContextMenu(e, gear)}
               >
-                <path
-                  d="M 40 0 L 0 0 0 40"
-                  fill="none"
-                  stroke="#D7CCC8"
-                  strokeWidth="1"
+                <GearSVG
+                  size={gear.size}
+                  role={gear.role}
+                  angle={gear.angle}
+                  {...(gear.locked !== undefined ? { locked: gear.locked } : {})}
+                  {...(gear.requiredDirection ? { requiredDirection: gear.requiredDirection } : {})}
                 />
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#grid)" />
-          </svg>
+              </div>
+            ))}
 
-          {gears.map((gear) => (
-            <div
-              key={gear.id}
-              className="absolute"
-              style={{
-                left: gear.position.x,
-                top: gear.position.y,
-                cursor: gear.role === "positional" ? "grab" : "default",
-              }}
-              onPointerDown={(e) => {
-                if (gear.role === "positional") {
-                  e.preventDefault();
-                  handleBoardGearDragStart(gear, e.clientX, e.clientY);
-                }
-              }}
-              onContextMenu={(e) => handleGearContextMenu(e, gear)}
-            >
-              <GearSVG
-                size={gear.size}
-                role={gear.role}
-                angle={gear.angle}
-                locked={gear.locked}
-                requiredDirection={gear.requiredDirection}
-              />
-            </div>
-          ))}
+            {dragging?.snapTarget && (
+              <div
+                className="absolute pointer-events-none"
+                style={{
+                  left: dragging.snapTarget.position.x - GEAR_DIMENSIONS[dragging.size].outerRadius,
+                  top: dragging.snapTarget.position.y - GEAR_DIMENSIONS[dragging.size].outerRadius,
+                }}
+              >
+                <GearSVG size={dragging.size} role="positional" angle={0} opacity={0.4} highlight />
+              </div>
+            )}
 
-          {dragging?.snapTarget && (
-            <div
-              className="absolute pointer-events-none"
-              style={{
-                left:
-                  dragging.snapTarget.position.x -
-                  GEAR_DIMENSIONS[dragging.size].outerRadius,
-                top:
-                  dragging.snapTarget.position.y -
-                  GEAR_DIMENSIONS[dragging.size].outerRadius,
-              }}
-            >
-              <GearSVG
-                size={dragging.size}
-                role="positional"
-                angle={0}
-                opacity={0.4}
-                highlight
-              />
-            </div>
-          )}
-
-          {dragging && (
-            <div
-              className="absolute pointer-events-none"
-              style={{
-                left: dragging.currentPos.x,
-                top: dragging.currentPos.y,
-                opacity: dragging.snapTarget ? 0.3 : 0.7,
-              }}
-            >
-              <GearSVG size={dragging.size} role="positional" angle={0} />
-            </div>
-          )}
+            {dragging && (
+              <div
+                className="absolute pointer-events-none"
+                style={{
+                  left: dragging.currentPos.x,
+                  top: dragging.currentPos.y,
+                  opacity: dragging.snapTarget ? 0.3 : 0.7,
+                }}
+              >
+                <GearSVG size={dragging.size} role="positional" angle={0} />
+              </div>
+            )}
+          </div>
+          {/* end transformed canvas */}
         </div>
+
+        <InventoryTray items={inventory} onDragStart={handleInventoryDragStart} />
       </div>
 
-      {won && <WinOverlay timeTakenMs={winTime} onContinue={onBack} />}
+      {won && (
+        <WinOverlay
+          timeTakenMs={winTime}
+          onContinue={onBack}
+          {...(solveResult?.leaderboard || leaderboard
+            ? { leaderboard: solveResult?.leaderboard ?? leaderboard ?? [] }
+            : {})}
+          {...(leaderboardActive !== undefined ? { leaderboardActive } : {})}
+          {...(solveResult?.rank !== undefined ? { rank: solveResult.rank } : {})}
+          {...(currentUser ? { currentUser } : {})}
+          {...(solveResult?.message ? { message: solveResult.message } : {})}
+        />
+      )}
     </div>
   );
 }
