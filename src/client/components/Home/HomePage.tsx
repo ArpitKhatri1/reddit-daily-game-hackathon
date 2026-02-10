@@ -33,27 +33,34 @@ export default function HomePage() {
         background: 'radial-gradient(ellipse at center, #4E342E 0%, #2C1810 50%, #1a0f0a 100%)',
       }}
     >
-      {/* Decorative background gears */}
-      <div className="absolute pointer-events-none" style={{ top: -60, left: -40, opacity: 0.08 }}>
+      {/* Decorative background gears (one is hidden on small screens to reduce clutter) */}
+      <div
+        className="absolute pointer-events-none transform scale-75 md:scale-100"
+        style={{ top: -40, left: -20, opacity: 0.08 }}
+      >
         <GearSVG size="extraLarge" role="positional" angle={heroAngle * 0.5} />
       </div>
       <div
-        className="absolute pointer-events-none"
-        style={{ bottom: -80, right: -60, opacity: 0.08 }}
+        className="absolute pointer-events-none hidden md:block"
+        style={{ bottom: -140, right: -60, opacity: 0.08 }}
       >
+        {/* This gear is hidden on phones to reduce clutter */}
         <GearSVG size="extraLarge" role="positional" angle={-heroAngle * 0.3} />
       </div>
-      <div className="absolute pointer-events-none" style={{ top: 100, right: 80, opacity: 0.06 }}>
+      <div
+        className="absolute pointer-events-none transform scale-75 md:scale-100"
+        style={{ top: 80, right: 60, opacity: 0.06 }}
+      >
         <GearSVG size="large" role="positional" angle={heroAngle * 0.7} />
       </div>
 
       {/* Title section */}
-      <div className="flex items-center gap-4 mb-2">
-        <div style={{ transform: 'scale(0.7)' }}>
-          <GearSVG size="medium" role="start" angle={heroAngle} />
+      <div className="flex items-center gap-3 mb-2">
+        <div className="transform scale-75 sm:scale-90 md:scale-100">
+          <GearSVG size="small" role="start" angle={heroAngle} />
         </div>
         <h1
-          className="text-5xl md:text-6xl font-bold"
+          className="text-3xl sm:text-4xl md:text-6xl font-bold -mx-2 w-fit"
           style={{
             color: '#FFD54F',
             fontFamily: 'Georgia, serif',
@@ -62,20 +69,23 @@ export default function HomePage() {
         >
           Gear Puzzle
         </h1>
-        <div style={{ transform: 'scale(0.7)' }}>
-          <GearSVG size="medium" role="goal" angle={-heroAngle} />
+        <div className="transform scale-75 sm:scale-90 md:scale-100">
+          <GearSVG size="small" role="goal" angle={-heroAngle} />
         </div>
       </div>
 
-      <p className="text-lg mb-10" style={{ color: '#A1887F', fontFamily: 'Georgia, serif' }}>
+      <p
+        className="text-base sm:text-lg mb-10"
+        style={{ color: '#A1887F', fontFamily: 'Georgia, serif' }}
+      >
         Connect the gears. Open the door.
       </p>
 
       {/* Menu buttons */}
-      <div className="flex flex-col gap-4 w-72">
+      <div className="flex flex-col gap-4 w-64 sm:w-72">
         <button
           onClick={() => navigate('/play')}
-          className="px-6 py-4 rounded-lg font-bold text-lg cursor-pointer transition-all hover:scale-105"
+          className="px-4 py-3 sm:px-6 sm:py-4 rounded-lg font-bold text-base sm:text-lg cursor-pointer transition-all hover:scale-105"
           style={{
             background: 'linear-gradient(to bottom, #FFD54F, #FF8F00)',
             color: '#3E2723',
@@ -89,7 +99,7 @@ export default function HomePage() {
 
         <button
           onClick={() => navigate('/editor')}
-          className="px-6 py-4 rounded-lg font-bold text-lg cursor-pointer transition-all hover:scale-105"
+          className="px-4 py-3 sm:px-6 sm:py-4 rounded-lg font-bold text-base sm:text-lg cursor-pointer transition-all hover:scale-105"
           style={{
             background: 'linear-gradient(to bottom, #66BB6A, #388E3C)',
             color: '#fff',
@@ -103,7 +113,7 @@ export default function HomePage() {
 
         <button
           onClick={() => navigate('/my-levels')}
-          className="px-6 py-4 rounded-lg font-bold text-lg cursor-pointer transition-all hover:scale-105"
+          className="px-4 py-3 sm:px-6 sm:py-4 rounded-lg font-bold text-base sm:text-lg cursor-pointer transition-all hover:scale-105"
           style={{
             background: 'linear-gradient(to bottom, #FF8F00, #E65100)',
             color: '#fff',
@@ -117,7 +127,7 @@ export default function HomePage() {
 
         <button
           onClick={() => navigate('/history')}
-          className="px-6 py-4 rounded-lg font-bold text-lg cursor-pointer transition-all hover:scale-105"
+          className="px-4 py-3 sm:px-6 sm:py-4 rounded-lg font-bold text-base sm:text-lg cursor-pointer transition-all hover:scale-105"
           style={{
             background: 'linear-gradient(to bottom, #5D4037, #3E2723)',
             color: '#D7CCC8',
@@ -132,7 +142,7 @@ export default function HomePage() {
         {isAdmin && (
           <button
             onClick={() => navigate('/editor?mode=daily')}
-            className="px-6 py-4 rounded-lg font-bold text-lg cursor-pointer transition-all hover:scale-105"
+            className="px-4 py-3 sm:px-6 sm:py-4 rounded-lg font-bold text-base sm:text-lg cursor-pointer transition-all hover:scale-105"
             style={{
               background: 'linear-gradient(to bottom, #AB47BC, #7B1FA2)',
               color: '#fff',
@@ -144,11 +154,6 @@ export default function HomePage() {
             &#9733;&ensp;Post Daily Puzzle
           </button>
         )}
-      </div>
-
-      {/* Footer */}
-      <div className="absolute bottom-4 text-xs" style={{ color: '#5D4037' }}>
-        A calm, precision-based gear puzzle
       </div>
     </div>
   );
