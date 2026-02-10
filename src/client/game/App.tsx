@@ -1,4 +1,4 @@
-import { Routes, Route, HashRouter } from 'react-router-dom';
+import { Routes, Route, MemoryRouter } from 'react-router-dom';
 import HomePage from '../components/Home/HomePage';
 import PlayPage from '../components/Play/PlayPage';
 import EditorPage from '../components/Editor/EditorPage';
@@ -7,7 +7,7 @@ import MyLevelsPage from '../components/MyLevels/MyLevelsPage';
 
 export default function App() {
   return (
-    <HashRouter>
+    <MemoryRouter>
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/play" element={<PlayPage />} />
@@ -16,6 +16,6 @@ export default function App() {
         <Route path="/history" element={<HistoryPage />} />
         <Route path="/my-levels" element={<MyLevelsPage />} />
       </Routes>
-    </HashRouter>
+    </MemoryRouter>
   );
 }

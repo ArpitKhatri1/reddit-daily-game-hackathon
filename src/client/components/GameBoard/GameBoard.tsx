@@ -55,7 +55,18 @@ export default function GameBoard({
   const animFrameRef = useRef<number>(0);
   const startTimeRef = useRef<number>(0);
 
-  const panZoom = usePanZoom({ minZoom: 0.3, maxZoom: 2.0 });
+  const panZoom = usePanZoom({ minZoom: 0.3, maxZoom: 2.0 }, boardRef);
+  const {
+    clientToCanvas,
+    canvasTransform,
+    handleWheel,
+    handlePointerDown: pzPointerDown,
+    handlePointerMove: pzPointerMove,
+    handlePointerUp: pzPointerUp,
+    cancelPan,
+    zoom,
+    resetView,
+  } = panZoom;
 
   const [gears, setGears] = useState<GearInstance[]>([]);
   const [inventory, setInventory] = useState<GearInventoryItem[]>([]);
@@ -125,18 +136,6 @@ export default function GameBoard({
       onWin(el);
     }
   }, [gears, won, onWin]);
-
-  const {
-    clientToCanvas,
-    canvasTransform,
-    handleWheel,
-    handlePointerDown: pzPointerDown,
-    handlePointerMove: pzPointerMove,
-    handlePointerUp: pzPointerUp,
-    cancelPan,
-    zoom,
-    resetView,
-  } = panZoom;
 
   const getBoardPos = useCallback(
     (clientX: number, clientY: number): Position => {

@@ -40,7 +40,7 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
   const boardRef = useRef<HTMLDivElement>(null);
   const animFrameRef = useRef<number>(0);
 
-  const panZoom = usePanZoom({ minZoom: 0.3, maxZoom: 2.0 });
+  const panZoom = usePanZoom({ minZoom: 0.3, maxZoom: 2.0 }, boardRef);
   const {
     clientToCanvas,
     canvasTransform,
@@ -448,24 +448,34 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
   };
 
   // ─── Publish as daily puzzle (admin only) ───────────────────────────────
+  const [showDailyConfirm, setShowDailyConfirm] = useState(false);
+
   const handlePublishDaily = async () => {
     const levelDef = buildLevelDef();
     if (!levelDef) return;
+    setShowDailyConfirm(true);
+  };
 
-    if (!confirm('Publish this as a Daily Puzzle?')) return;
+  const confirmPublishDaily = async () => {
+    // Close the dialog and perform publish
+    setShowDailyConfirm(false);
+    const levelDef = buildLevelDef();
+    if (!levelDef) return;
 
     setPublishing(true);
     try {
       const data = toLevelData(levelDef);
+      console.debug('[LevelEditor] publishing daily puzzle', data.id);
       const result = await publishDaily(data);
       if (result.status === 'success') {
-        alert(`Daily Puzzle #${result.dailyNumber} published!`);
+        console.log(`Daily Puzzle #${result.dailyNumber} published!`);
         onBack();
       } else {
-        alert(`Publish failed: ${result.message || 'Unknown error'}`);
+        console.log(`Publish failed: ${result.message || 'Unknown error'}`);
       }
     } catch (err) {
-      alert(`Publish failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      console.error('Publish daily error:', err);
+      console.log(`Publish failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setPublishing(false);
     }
@@ -602,7 +612,7 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
                 </button>
                 {isDailyMode && (
                   <button
-                    onClick={() => void handlePublishDaily()}
+                    onClick={() => handlePublishDaily()}
                     disabled={publishing}
                     className="px-3 py-1.5 rounded font-bold text-sm cursor-pointer"
                     style={{
@@ -916,6 +926,46 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
           )}
         </div>
       </div>
+
+      {/* Confirmation modal for daily publishing */}
+      {showDailyConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)' }} />
+          <div
+            className="relative z-10 p-6 rounded-lg"
+            style={{ background: 'rgba(62,39,35,0.95)', border: '2px solid #8D6E63', width: 380 }}
+          >
+            <h3 className="text-lg font-bold mb-2" style={{ color: '#FFD54F' }}>
+              Publish as Daily Puzzle?
+            </h3>
+            <p style={{ color: '#D7CCC8' }} className="mb-4">
+              This will post the current level as the official Daily Puzzle. Are you sure?
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowDailyConfirm(false)}
+                className="px-3 py-1.5 rounded font-bold text-sm"
+                style={{ background: '#5D4037', color: '#D7CCC8', border: '1px solid #795548' }}
+                disabled={publishing}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void confirmPublishDaily()}
+                className="px-3 py-1.5 rounded font-bold text-sm"
+                style={{
+                  background: 'linear-gradient(to bottom, #AB47BC, #7B1FA2)',
+                  color: '#fff',
+                  border: '1px solid #9C27B0',
+                }}
+                disabled={publishing}
+              >
+                {publishing ? 'Posting...' : 'Post Daily'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -21,7 +21,10 @@ const DEFAULT_MAX_ZOOM = 2.0;
 const DEFAULT_CANVAS_WIDTH = 2400;
 const DEFAULT_CANVAS_HEIGHT = 1600;
 
-export function usePanZoom(options: UsePanZoomOptions = {}) {
+export function usePanZoom(
+  options: UsePanZoomOptions = {},
+  containerRef?: React.RefObject<HTMLElement | null>
+) {
   const {
     minZoom = DEFAULT_MIN_ZOOM,
     maxZoom = DEFAULT_MAX_ZOOM,
@@ -71,7 +74,10 @@ export function usePanZoom(options: UsePanZoomOptions = {}) {
   const handleWheel = useCallback(
     (e: React.WheelEvent<HTMLDivElement>) => {
       e.preventDefault();
-      const rect = e.currentTarget.getBoundingClientRect();
+      const rect =
+        (containerRef && containerRef.current && containerRef.current.getBoundingClientRect()) ||
+        (e.currentTarget && (e.currentTarget as Element).getBoundingClientRect()) ||
+        new DOMRect(0, 0, window.innerWidth || 800, window.innerHeight || 600);
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
 
@@ -85,7 +91,7 @@ export function usePanZoom(options: UsePanZoomOptions = {}) {
         return { zoom: newZoom, ...clamped };
       });
     },
-    [minZoom, maxZoom, clampPan]
+    [minZoom, maxZoom, clampPan, containerRef]
   );
 
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -112,7 +118,10 @@ export function usePanZoom(options: UsePanZoomOptions = {}) {
         // Pinch zoom
         const pts = Array.from(pointerCache.current.values());
         const dist = Math.hypot(pts[1]!.x - pts[0]!.x, pts[1]!.y - pts[0]!.y);
-        const rect = e.currentTarget.getBoundingClientRect();
+        const rect =
+          (containerRef && containerRef.current && containerRef.current.getBoundingClientRect()) ||
+          (e.currentTarget && (e.currentTarget as Element).getBoundingClientRect()) ||
+          new DOMRect(0, 0, window.innerWidth || 800, window.innerHeight || 600);
         const midX = (pts[0]!.x + pts[1]!.x) / 2 - rect.left;
         const midY = (pts[0]!.y + pts[1]!.y) / 2 - rect.top;
         const scale = dist / lastPinchDist.current;
@@ -134,7 +143,12 @@ export function usePanZoom(options: UsePanZoomOptions = {}) {
         lastPointer.current = { x: e.clientX, y: e.clientY };
 
         setState((prev) => {
-          const rect = e.currentTarget.getBoundingClientRect();
+          const rect =
+            (containerRef &&
+              containerRef.current &&
+              containerRef.current.getBoundingClientRect()) ||
+            (e.currentTarget && (e.currentTarget as Element).getBoundingClientRect()) ||
+            new DOMRect(0, 0, window.innerWidth || 800, window.innerHeight || 600);
           const clamped = clampPan(
             prev.panX + dx,
             prev.panY + dy,
@@ -146,7 +160,7 @@ export function usePanZoom(options: UsePanZoomOptions = {}) {
         });
       }
     },
-    [minZoom, maxZoom, clampPan]
+    [minZoom, maxZoom, clampPan, containerRef]
   );
 
   const handlePointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
