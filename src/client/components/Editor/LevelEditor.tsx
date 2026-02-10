@@ -639,11 +639,15 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
           style={{
             background: 'radial-gradient(ellipse at center, #4E342E 0%, #2C1810 70%)',
             cursor: mode === 'edit' && placingRole ? 'copy' : 'crosshair',
+            touchAction: 'none',
+            userSelect: 'none',
           }}
           onClick={handleBoardClick}
           onWheel={handleWheel}
           onPointerDown={(e) => {
             if (!dragging && !placingRole) {
+              // Prevent the OS from hijacking the touch (scrolling, pinch)
+              e.preventDefault();
               pzPointerDown(e);
             }
           }}
@@ -671,6 +675,8 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
               transformOrigin: '0 0',
               width: 2400,
               height: 1600,
+              touchAction: 'none',
+              userSelect: 'none',
             }}
           >
             {/* Grid */}

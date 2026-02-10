@@ -315,11 +315,15 @@ export default function GameBoard({
           className="flex-1 relative overflow-hidden cursor-crosshair"
           style={{
             background: 'radial-gradient(ellipse at center, #4E342E 0%, #2C1810 70%)',
+            touchAction: 'none',
+            userSelect: 'none',
           }}
           onWheel={handleWheel}
           onPointerDown={(e) => {
             // Only start pan if not dragging a gear
             if (!dragging) {
+              // Prevent native touch scrolling from stealing the pointer on mobile
+              e.preventDefault();
               pzPointerDown(e);
             }
           }}
@@ -347,6 +351,8 @@ export default function GameBoard({
               transformOrigin: '0 0',
               width: 2400,
               height: 1600,
+              touchAction: 'none',
+              userSelect: 'none',
             }}
           >
             <svg

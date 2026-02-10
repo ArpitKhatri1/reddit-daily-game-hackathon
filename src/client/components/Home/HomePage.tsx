@@ -60,7 +60,7 @@ export default function HomePage() {
           <GearSVG size="small" role="start" angle={heroAngle} />
         </div>
         <h1
-          className="text-3xl sm:text-4xl md:text-6xl font-bold -mx-2 w-fit"
+          className="text-2xl sm:text-4xl md:text-6xl font-bold -mx-2 w-fit"
           style={{
             color: '#FFD54F',
             fontFamily: 'Georgia, serif',
