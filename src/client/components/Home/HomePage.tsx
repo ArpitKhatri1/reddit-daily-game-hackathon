@@ -15,6 +15,19 @@ export default function HomePage() {
       .catch(() => {});
   }, []);
 
+  // If splash set a navigation flag before requesting expanded mode, follow it once HomePage mounts
+  useEffect(() => {
+    try {
+      const navPath = localStorage.getItem('devvit_navigate_after_expand');
+      if (navPath) {
+        localStorage.removeItem('devvit_navigate_after_expand');
+        void navigate(navPath);
+      }
+    } catch (err) {
+      // ignore
+    }
+  }, [navigate]);
+
   // Animate hero gears
   useEffect(() => {
     let frame: number;

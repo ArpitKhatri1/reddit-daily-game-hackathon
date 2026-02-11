@@ -14,6 +14,8 @@ interface UsePanZoomOptions {
   /** Maximum canvas size that limits how far you can pan */
   canvasWidth?: number;
   canvasHeight?: number;
+  /** Initial zoom scale to use when the hook first mounts */
+  initialZoom?: number;
 }
 
 const DEFAULT_MIN_ZOOM = 0.3;
@@ -30,19 +32,14 @@ export function usePanZoom(
     maxZoom = DEFAULT_MAX_ZOOM,
     canvasWidth = DEFAULT_CANVAS_WIDTH,
     canvasHeight = DEFAULT_CANVAS_HEIGHT,
+    initialZoom = 1,
   } = options;
 
   const [state, setState] = useState<PanZoomState>({
     panX: 0,
     panY: 0,
-    zoom: 1,
+    zoom: initialZoom,
   });
-
-  const isPanning = useRef(false);
-  const lastPointer = useRef({ x: 0, y: 0 });
-  /** How many pointers are down (2 = pinch) */
-  const pointerCache = useRef<Map<number, { x: number; y: number }>>(new Map());
-  const lastPinchDist = useRef<number | null>(null);
 
   const clampPan = useCallback(
     (px: number, py: number, z: number, viewW: number, viewH: number) => {
@@ -70,6 +67,22 @@ export function usePanZoom(
     },
     [canvasWidth, canvasHeight]
   );
+
+  // Compute the centered pan for a given zoom and viewport size
+  const computeCenterPan = useCallback(
+    (z: number, viewW: number, viewH: number) => {
+      const centeredX = (viewW - canvasWidth * z) / 2;
+      const centeredY = (viewH - canvasHeight * z) / 2;
+      return clampPan(centeredX, centeredY, z, viewW, viewH);
+    },
+    [canvasWidth, canvasHeight, clampPan]
+  );
+
+  const isPanning = useRef(false);
+  const lastPointer = useRef({ x: 0, y: 0 });
+  /** How many pointers are down (2 = pinch) */
+  const pointerCache = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const lastPinchDist = useRef<number | null>(null);
 
   const handleWheel = useCallback(
     (e: React.WheelEvent<HTMLDivElement>) => {
@@ -174,8 +187,23 @@ export function usePanZoom(
   }, []);
 
   const resetView = useCallback(() => {
-    setState({ panX: 0, panY: 0, zoom: 1 });
-  }, []);
+    const z = initialZoom;
+    if (containerRef && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const centered = computeCenterPan(z, rect.width, rect.height);
+      setState({ zoom: z, panX: centered.panX, panY: centered.panY });
+    } else {
+      setState({ zoom: z, panX: 0, panY: 0 });
+    }
+  }, [initialZoom, containerRef, computeCenterPan]);
+
+  // Center view when the container appears / on mount
+  React.useEffect(() => {
+    // If we have a container, center immediately
+    if (containerRef && containerRef.current) {
+      resetView();
+    }
+  }, [containerRef, resetView]);
 
   /** Cancel any in-progress pan (call when a gear drag starts) */
   const cancelPan = useCallback(() => {

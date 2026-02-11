@@ -3,7 +3,7 @@ import GearSVG from '../Gear/GearSVG';
 
 interface InventoryTrayProps {
   items: GearInventoryItem[];
-  onDragStart: (item: GearInventoryItem, clientX: number, clientY: number, pointerId?: number) => void;
+  onDragStart: (item: GearInventoryItem, clientX: number, clientY: number) => void;
 }
 
 export default function InventoryTray({ items, onDragStart }: InventoryTrayProps) {
@@ -18,9 +18,8 @@ export default function InventoryTray({ items, onDragStart }: InventoryTrayProps
 
   return (
     <div
-      className="flex items-center gap-3 px-3 py-2 shrink-0 overflow-x-auto overflow-y-hidden"
+      className="flex items-center gap-3 h-18 px-3 py-2 shrink-0 overflow-x-auto overflow-y-hidden"
       style={{
-        height: 90,
         background: 'linear-gradient(to top, #3E2723, #4E342E)',
         borderTop: '2px solid #5D4037',
       }}
@@ -44,7 +43,7 @@ export default function InventoryTray({ items, onDragStart }: InventoryTrayProps
             {size} &times;{groupItems.length}
           </div>
           <div
-            className="cursor-grab active:cursor-grabbing p-1 rounded"
+            className="cursor-grab active:cursor-grabbing p-3 rounded"
             style={{
               border: '1px dashed #5D4037',
               background: 'rgba(93,64,55,0.2)',
@@ -55,10 +54,10 @@ export default function InventoryTray({ items, onDragStart }: InventoryTrayProps
               e.preventDefault();
               const item = groupItems[0];
               if (!item) return;
-              onDragStart(item, e.clientX, e.clientY, e.pointerId);
+              onDragStart(item, e.clientX, e.clientY);
             }}
           >
-            <GearSVG size={size as GearInventoryItem['size']} role="positional" angle={0} />
+            <GearSVG size="small" role="positional" angle={0} />
           </div>
         </div>
       ))}

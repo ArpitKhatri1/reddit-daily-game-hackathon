@@ -40,7 +40,7 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
   const boardRef = useRef<HTMLDivElement>(null);
   const animFrameRef = useRef<number>(0);
 
-  const panZoom = usePanZoom({ minZoom: 0.3, maxZoom: 2.0 }, boardRef);
+  const panZoom = usePanZoom({ minZoom: 0.3, maxZoom: 2.0, initialZoom: 0.5 }, boardRef);
   const {
     clientToCanvas,
     canvasTransform,
@@ -52,6 +52,11 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
     zoom,
     resetView,
   } = panZoom;
+
+  // Apply initial centered view on mount
+  useEffect(() => {
+    resetView();
+  }, [resetView]);
 
   const [mode, setMode] = useState<EditorMode>('edit');
   const [levelName, setLevelName] = useState(existingLevel?.name || 'My Level');

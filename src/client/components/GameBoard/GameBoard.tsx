@@ -57,7 +57,7 @@ export default function GameBoard({
   const animFrameRef = useRef<number>(0);
   const startTimeRef = useRef<number>(0);
 
-  const panZoom = usePanZoom({ minZoom: 0.3, maxZoom: 2.0 }, boardRef);
+  const panZoom = usePanZoom({ minZoom: 0.3, maxZoom: 2.0, initialZoom: 0.5 }, boardRef);
   const {
     clientToCanvas,
     canvasTransform,
@@ -69,6 +69,11 @@ export default function GameBoard({
     zoom,
     resetView,
   } = panZoom;
+
+  // Ensure the initial centered view is applied on mount
+  useEffect(() => {
+    resetView();
+  }, [resetView]);
 
   const [gears, setGears] = useState<GearInstance[]>([]);
   const [inventory, setInventory] = useState<GearInventoryItem[]>([]);
@@ -280,19 +285,7 @@ export default function GameBoard({
 
   return (
     <div className="flex flex-col h-screen w-screen" style={{ background: '#2C1810' }}>
-      {/* Elapsed timer bar */}
-      {!won && (
-        <div
-          className="flex items-center justify-center py-1 shrink-0"
-          style={{ background: '#1a0f0a' }}
-        >
-          <span className="text-sm font-mono font-bold tracking-wider" style={{ color: '#FFD54F' }}>
-            ⏱ {formatElapsed(elapsed)}
-          </span>
-        </div>
-      )}
-
-      {/* Top bar */}
+      {/* Top bar (includes timer beside level name) */}
       <div
         className="flex items-center justify-between px-6 py-3 shrink-0"
         style={{
@@ -311,12 +304,23 @@ export default function GameBoard({
         >
           &larr; Back
         </button>
-        <h2
-          className="text-lg font-bold"
-          style={{ color: '#D7CCC8', fontFamily: 'Georgia, serif' }}
-        >
-          {level.name}
-        </h2>
+        <div className="flex items-center gap-3">
+          <h2
+            className="text-lg font-bold"
+            style={{ color: '#D7CCC8', fontFamily: 'Georgia, serif' }}
+          >
+            {level.name}
+          </h2>
+          {!won && (
+            <span
+              className="text-sm font-mono font-bold tracking-wider"
+              style={{ color: '#FFD54F' }}
+              aria-live="polite"
+            >
+              ⏱ {formatElapsed(elapsed)}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <button
             onClick={resetView}
