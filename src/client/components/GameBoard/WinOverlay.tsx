@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import type { LeaderboardEntry } from '../../../shared/types/api';
 import Leaderboard from '../Leaderboard/Leaderboard';
+import { fetchLeaderboard } from '../../lib/api';
 
 interface WinOverlayProps {
   timeTakenMs: number;
@@ -9,6 +11,7 @@ interface WinOverlayProps {
   rank?: number;
   currentUser?: string;
   message?: string;
+  postId?: string;
 }
 
 export default function WinOverlay({
@@ -19,7 +22,51 @@ export default function WinOverlay({
   rank,
   currentUser,
   message,
+  postId,
 }: WinOverlayProps) {
+  const [entries, setEntries] = useState<LeaderboardEntry[]>(leaderboard ?? []);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    let intervalId: number | undefined;
+
+    // Use the passed-in leaderboard as seed
+    setEntries(leaderboard ?? []);
+
+    const doFetch = async () => {
+      if (!postId) return;
+      setLoading(true);
+      try {
+        const res = await fetchLeaderboard(postId);
+        if (!mounted) return;
+        setEntries(res.leaderboard ?? []);
+      } catch (err) {
+        // ignore
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    // Start fetching immediately (in background) and poll every few seconds
+    if (postId) {
+      void doFetch();
+      intervalId = window.setInterval(() => {
+        void doFetch();
+      }, 3000);
+    }
+
+    // Delay showing the leaderboard visually
+    const showTimer = window.setTimeout(() => setShowLeaderboard(true), 1000);
+
+    return () => {
+      mounted = false;
+      if (intervalId) window.clearInterval(intervalId);
+      clearTimeout(showTimer);
+    };
+  }, [postId, leaderboard]);
+
   const formatTime = (ms: number) => {
     const seconds = Math.floor(ms / 1000);
     const minutes = Math.floor(seconds / 60);
@@ -63,16 +110,32 @@ export default function WinOverlay({
           {rank && rank <= 10 && <span style={{ color: '#FFD54F' }}> 🏅 You ranked #{rank}!</span>}
         </p>
 
-        {/* Leaderboard */}
-        {leaderboard && leaderboard.length > 0 && (
-          <div className="w-80 mb-6">
-            <Leaderboard
-              entries={leaderboard}
-              active={leaderboardActive ?? false}
-              currentUser={currentUser ?? ''}
-            />
-          </div>
-        )}
+        {/* Leaderboard: hidden for 1.5s, continues to fetch in background */}
+        <div
+          className="w-80 mb-6 transition-opacity duration-300"
+          style={{
+            opacity: showLeaderboard ? 1 : 0,
+            pointerEvents: showLeaderboard ? 'auto' : 'none',
+          }}
+        >
+          {showLeaderboard ? (
+            entries.length > 0 ? (
+              <Leaderboard
+                entries={entries}
+                active={leaderboardActive ?? false}
+                currentUser={currentUser ?? ''}
+              />
+            ) : (
+              <div className="p-3 text-center text-sm" style={{ color: '#A1887F' }}>
+                {loading ? 'Loading leaderboard...' : 'No solves yet.'}
+              </div>
+            )
+          ) : (
+            <div className="p-3 text-center text-sm" style={{ color: '#A1887F' }}>
+              {loading ? 'Loading leaderboard...' : 'Fetching leaderboard...'}
+            </div>
+          )}
+        </div>
 
         <button
           onClick={onContinue}

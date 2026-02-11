@@ -127,6 +127,7 @@ export default function PlayPage() {
       onBack={handleBack}
       leaderboard={leaderboard}
       leaderboardActive={leaderboardActive}
+      postId={postId ?? undefined}
       currentUser={currentUser}
       {...(solveResult ? { solveResult } : {})}
     />

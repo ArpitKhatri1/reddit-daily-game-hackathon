@@ -25,6 +25,7 @@ interface GameBoardProps {
   onBack: () => void;
   leaderboard?: LeaderboardEntry[];
   leaderboardActive?: boolean;
+  postId?: string;
   solveResult?: {
     leaderboard: LeaderboardEntry[];
     rank?: number;
@@ -50,6 +51,7 @@ export default function GameBoard({
   leaderboardActive,
   solveResult,
   currentUser,
+  postId,
 }: GameBoardProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   const animFrameRef = useRef<number>(0);
@@ -70,10 +72,6 @@ export default function GameBoard({
 
   const [gears, setGears] = useState<GearInstance[]>([]);
   const [inventory, setInventory] = useState<GearInventoryItem[]>([]);
-  const [won, setWon] = useState(false);
-  const [winTime, setWinTime] = useState(0);
-  const [elapsed, setElapsed] = useState(0);
-
   const [dragging, setDragging] = useState<{
     inventoryId?: string;
     gearId?: string;
@@ -82,6 +80,12 @@ export default function GameBoard({
     currentPos: Position;
     snapTarget: { position: Position; anchorId: string } | null;
   } | null>(null);
+  const [won, setWon] = useState(false);
+  const [winTime, setWinTime] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  // Show overlay after a short delay so leaderboard can be fetched in background
+  const [overlayVisible, setOverlayVisible] = useState(false);
+  const overlayTimerRef = useRef<number | null>(null);
 
   // Initialize level
   useEffect(() => {
@@ -96,6 +100,12 @@ export default function GameBoard({
     setWon(false);
     setWinTime(0);
     setElapsed(0);
+    // Reset overlay visibility and cleanup any pending timers
+    setOverlayVisible(false);
+    if (overlayTimerRef.current) {
+      window.clearTimeout(overlayTimerRef.current);
+      overlayTimerRef.current = null;
+    }
     startTimeRef.current = Date.now();
   }, [level]);
 
@@ -134,8 +144,20 @@ export default function GameBoard({
       setWon(true);
       setWinTime(el);
       onWin(el);
+      // Delay showing the overlay (so leaderboard fetch can happen in background)
+      overlayTimerRef.current = window.setTimeout(() => {
+        setOverlayVisible(true);
+        overlayTimerRef.current = null;
+      }, 1500);
     }
   }, [gears, won, onWin]);
+
+  // Cleanup overlay timer on unmount
+  useEffect(() => {
+    return () => {
+      if (overlayTimerRef.current) window.clearTimeout(overlayTimerRef.current);
+    };
+  }, []);
 
   const getBoardPos = useCallback(
     (clientX: number, clientY: number): Position => {
@@ -427,7 +449,7 @@ export default function GameBoard({
         <InventoryTray items={inventory} onDragStart={handleInventoryDragStart} />
       </div>
 
-      {won && (
+      {overlayVisible && (
         <WinOverlay
           timeTakenMs={winTime}
           onContinue={onBack}
@@ -437,6 +459,7 @@ export default function GameBoard({
           {...(leaderboardActive !== undefined ? { leaderboardActive } : {})}
           {...(solveResult?.rank !== undefined ? { rank: solveResult.rank } : {})}
           {...(currentUser ? { currentUser } : {})}
+          {...(postId ? { postId } : {})}
           {...(solveResult?.message ? { message: solveResult.message } : {})}
         />
       )}
