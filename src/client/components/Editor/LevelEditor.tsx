@@ -507,6 +507,19 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
   });
 
   const sidebarInventory = mode === 'edit' ? remainingEditInventory : testInventory;
+
+  // Group items by size for display like InventoryTray
+  const groupedInventory = sidebarInventory.reduce<Record<string, GearInventoryItem[]>>(
+    (acc, item) => {
+      if (!acc[item.size]) {
+        acc[item.size] = [];
+      }
+      acc[item.size]!.push(item);
+      return acc;
+    },
+    {}
+  );
+
   const lockedCount = gears.filter((g) => g.locked).length;
 
   return (
@@ -517,10 +530,10 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
       onPointerMove={(e) => {
         if (dragging) handleGlobalPointerMove(e);
       }}
-      onPointerUp={(e) => {
+      onPointerUp={() => {
         if (dragging) handleGlobalPointerUp();
       }}
-      onPointerLeave={(e) => {
+      onPointerLeave={() => {
         if (dragging) handleGlobalPointerUp();
       }}
     >
@@ -807,14 +820,14 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
         <div
           className="shrink-0 overflow-y-auto"
           style={{
-            maxHeight: '40vh',
+            maxHeight: '30vh',
             background: 'linear-gradient(to top, #3E2723, #4E342E)',
             borderTop: '2px solid #5D4037',
           }}
         >
           {/* Draggable inventory tray — horizontal row */}
           <div
-            className="flex items-center gap-2 px-3 py-2 overflow-x-auto h-18 overflow-y-hidden"
+            className="flex items-center gap-1 md:gap-2 px-1 md:px-3 py-2 overflow-x-auto h-22 overflow-y-hidden"
             style={{ borderBottom: '1px solid #5D4037' }}
           >
             <div
@@ -828,23 +841,36 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
                 {mode === 'edit' ? 'All inventory gears placed!' : 'All gears placed!'}
               </div>
             )}
-            {sidebarInventory.map((item) => (
+            {Object.entries(groupedInventory).map(([size, groupItems]) => (
               <div
-                key={item.id}
-                className="cursor-grab active:cursor-grabbing p-1 rounded shrink-0"
-                style={{
-                  border: '1px dashed #5D4037',
-                  background: 'rgba(93,64,55,0.2)',
-                  transform: 'scale(0.5)',
-                  transformOrigin: 'center',
-                  touchAction: 'none', // Important: Prevents browser scroll capture on the ITEM itself
-                }}
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  handleInventoryDragStart(item, e.clientX, e.clientY);
-                }}
+                key={size}
+                className="flex flex-col items-center justify-center gap-1 shrink-0 mx-2 py-2"
               >
-                <GearSVG size={'small'} role="positional" angle={0} />
+                <div
+                  className="text-[10px] md:text-xs capitalize leading-tight mb-1"
+                  style={{ color: '#8D6E63' }}
+                >
+                  {size} <span className="opacity-70">×{groupItems.length}</span>
+                </div>
+                <div
+                  className="cursor-grab active:cursor-grabbing p-3 rounded"
+                  style={{
+                    border: '1px dashed #5D4037',
+                    background: 'rgba(93,64,55,0.2)',
+                    transformOrigin: 'center',
+                    touchAction: 'none',
+                  }}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    const item = groupItems[0];
+                    if (!item) return;
+                    handleInventoryDragStart(item, e.clientX, e.clientY);
+                  }}
+                >
+                  <div className="w-8 h-8 md:w-12 md:h-12 flex items-center justify-center scale-[0.5]">
+                    <GearSVG size={'small'} role="positional" angle={0} />
+                  </div>
+                </div>
               </div>
             ))}
           </div>

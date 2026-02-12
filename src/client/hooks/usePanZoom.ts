@@ -1,20 +1,16 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 
 export interface PanZoomState {
-  /** Current pan offset (pixels) */
   panX: number;
   panY: number;
-  /** Current zoom scale (1 = 100%) */
   zoom: number;
 }
 
 interface UsePanZoomOptions {
   minZoom?: number;
   maxZoom?: number;
-  /** Maximum canvas size that limits how far you can pan */
   canvasWidth?: number;
   canvasHeight?: number;
-  /** Initial zoom scale to use when the hook first mounts */
   initialZoom?: number;
 }
 
@@ -22,6 +18,22 @@ const DEFAULT_MIN_ZOOM = 0.3;
 const DEFAULT_MAX_ZOOM = 2.0;
 const DEFAULT_CANVAS_WIDTH = 2400;
 const DEFAULT_CANVAS_HEIGHT = 1600;
+
+// Helper: Calculate the center (centroid) of all active pointers
+function getCentroid(pointers: Map<number, { x: number; y: number }>) {
+  const pts = Array.from(pointers.values());
+  if (pts.length === 0) return { x: 0, y: 0 };
+
+  const total = pts.reduce((acc, curr) => ({ x: acc.x + curr.x, y: acc.y + curr.y }), {
+    x: 0,
+    y: 0,
+  });
+
+  return {
+    x: total.x / pts.length,
+    y: total.y / pts.length,
+  };
+}
 
 export function usePanZoom(
   options: UsePanZoomOptions = {},
@@ -50,10 +62,8 @@ export function usePanZoom(
       let clampedY: number;
 
       if (scaledW <= viewW) {
-        // Canvas fits inside viewport → center it, no panning
         clampedX = (viewW - scaledW) / 2;
       } else {
-        // Canvas is bigger than viewport → clamp so it always covers the viewport
         clampedX = Math.max(viewW - scaledW, Math.min(0, px));
       }
 
@@ -68,7 +78,6 @@ export function usePanZoom(
     [canvasWidth, canvasHeight]
   );
 
-  // Compute the centered pan for a given zoom and viewport size
   const computeCenterPan = useCallback(
     (z: number, viewW: number, viewH: number) => {
       const centeredX = (viewW - canvasWidth * z) / 2;
@@ -80,7 +89,6 @@ export function usePanZoom(
 
   const isPanning = useRef(false);
   const lastPointer = useRef({ x: 0, y: 0 });
-  /** How many pointers are down (2 = pinch) */
   const pointerCache = useRef<Map<number, { x: number; y: number }>>(new Map());
   const lastPinchDist = useRef<number | null>(null);
 
@@ -97,7 +105,6 @@ export function usePanZoom(
       setState((prev) => {
         const factor = e.deltaY > 0 ? 0.9 : 1.1;
         const newZoom = Math.max(minZoom, Math.min(maxZoom, prev.zoom * factor));
-        // Zoom towards mouse pointer
         const newPanX = mx - (mx - prev.panX) * (newZoom / prev.zoom);
         const newPanY = my - (my - prev.panY) * (newZoom / prev.zoom);
         const clamped = clampPan(newPanX, newPanY, newZoom, rect.width, rect.height);
@@ -108,37 +115,52 @@ export function usePanZoom(
   );
 
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
     pointerCache.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (pointerCache.current.size === 1 && (e.button === 1 || e.button === 0)) {
-      // Left-click or middle-click can start a pan.
-      // The consuming component should only call this when the click is on empty canvas.
-      isPanning.current = true;
-      lastPointer.current = { x: e.clientX, y: e.clientY };
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } else if (pointerCache.current.size === 2) {
-      // Start pinch
+
+    // 1. Calculate the new centroid of all fingers
+    const centroid = getCentroid(pointerCache.current);
+
+    // 2. Reset the lastPointer to this new centroid immediately
+    // This prevents jumps when going from 0->1 or 1->2 fingers
+    lastPointer.current = centroid;
+
+    isPanning.current = true;
+
+    if (pointerCache.current.size === 2) {
       const pts = Array.from(pointerCache.current.values());
       lastPinchDist.current = Math.hypot(pts[1]!.x - pts[0]!.x, pts[1]!.y - pts[0]!.y);
-      isPanning.current = true;
     }
   }, []);
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
+      // Update the current pointer position in cache
       pointerCache.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
+      // PINCH ZOOM LOGIC
       if (pointerCache.current.size === 2 && lastPinchDist.current !== null) {
-        // Pinch zoom
         const pts = Array.from(pointerCache.current.values());
         const dist = Math.hypot(pts[1]!.x - pts[0]!.x, pts[1]!.y - pts[0]!.y);
+
         const rect =
           (containerRef && containerRef.current && containerRef.current.getBoundingClientRect()) ||
           (e.currentTarget && (e.currentTarget as Element).getBoundingClientRect()) ||
           new DOMRect(0, 0, window.innerWidth || 800, window.innerHeight || 600);
+
+        // Midpoint relative to the container (for zoom origin)
         const midX = (pts[0]!.x + pts[1]!.x) / 2 - rect.left;
         const midY = (pts[0]!.y + pts[1]!.y) / 2 - rect.top;
+
+        // Midpoint in Client coordinates (for updating lastPointer)
+        const clientMidX = (pts[0]!.x + pts[1]!.x) / 2;
+        const clientMidY = (pts[0]!.y + pts[1]!.y) / 2;
+
         const scale = dist / lastPinchDist.current;
         lastPinchDist.current = dist;
+
+        // IMPORTANT: Keep lastPointer synced with the pinch center
+        lastPointer.current = { x: clientMidX, y: clientMidY };
 
         setState((prev) => {
           const newZoom = Math.max(minZoom, Math.min(maxZoom, prev.zoom * scale));
@@ -150,9 +172,12 @@ export function usePanZoom(
         return;
       }
 
+      // PAN LOGIC
       if (isPanning.current && pointerCache.current.size === 1) {
+        // Here, lastPointer.current was reset in handlePointerUp if we just dropped a finger
         const dx = e.clientX - lastPointer.current.x;
         const dy = e.clientY - lastPointer.current.y;
+
         lastPointer.current = { x: e.clientX, y: e.clientY };
 
         setState((prev) => {
@@ -162,6 +187,7 @@ export function usePanZoom(
               containerRef.current.getBoundingClientRect()) ||
             (e.currentTarget && (e.currentTarget as Element).getBoundingClientRect()) ||
             new DOMRect(0, 0, window.innerWidth || 800, window.innerHeight || 600);
+
           const clamped = clampPan(
             prev.panX + dx,
             prev.panY + dy,
@@ -178,11 +204,20 @@ export function usePanZoom(
 
   const handlePointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     pointerCache.current.delete(e.pointerId);
+
     if (pointerCache.current.size < 2) {
       lastPinchDist.current = null;
     }
+
     if (pointerCache.current.size === 0) {
       isPanning.current = false;
+    } else {
+      // CRITICAL FIX:
+      // If fingers remain (e.g. 2 -> 1), calculate the NEW center
+      // and reset lastPointer. This prevents the "jump" because the next
+      // move event will calculate delta from this new center, not the old midpoint.
+      const centroid = getCentroid(pointerCache.current);
+      lastPointer.current = centroid;
     }
   }, []);
 
@@ -197,22 +232,18 @@ export function usePanZoom(
     }
   }, [initialZoom, containerRef, computeCenterPan]);
 
-  // Center view when the container appears / on mount
-  React.useEffect(() => {
-    // If we have a container, center immediately
+  useEffect(() => {
     if (containerRef && containerRef.current) {
       resetView();
     }
   }, [containerRef, resetView]);
 
-  /** Cancel any in-progress pan (call when a gear drag starts) */
   const cancelPan = useCallback(() => {
     isPanning.current = false;
     pointerCache.current.clear();
     lastPinchDist.current = null;
   }, []);
 
-  /** Convert client coords to canvas (board) coords */
   const clientToCanvas = useCallback(
     (clientX: number, clientY: number, rect: DOMRect) => {
       return {
@@ -233,7 +264,6 @@ export function usePanZoom(
     cancelPan,
     clientToCanvas,
     isPanning: isPanning.current,
-    /** CSS transform for the canvas container */
     canvasTransform: `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`,
   };
 }
