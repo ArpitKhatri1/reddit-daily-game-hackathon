@@ -1,5 +1,5 @@
-import type { GearInstance, GearSize, Position } from "../types";
-import { GEAR_DIMENSIONS, MESH_TOLERANCE, BASE_ROTATION_SPEED } from "./constants";
+import type { GearInstance, GearSize, Position } from '../types';
+import { GEAR_DIMENSIONS, MESH_TOLERANCE, BASE_ROTATION_SPEED } from './constants';
 
 // ─── Geometry helpers ──────────────────────────────────────────────────────
 
@@ -124,16 +124,18 @@ export function propagateRotation(gears: GearInstance[]): GearInstance[] {
   const updated = gears.map((g) => ({
     ...g,
     meshedWith: [] as string[],
-    rotationSpeed: g.role === "start" ? g.rotationSpeed : 0,
+    rotationSpeed: g.role === 'start' ? g.rotationSpeed : 0,
     locked: false,
   }));
 
   // Build adjacency: check every pair
   for (let i = 0; i < updated.length; i++) {
     for (let j = i + 1; j < updated.length; j++) {
-      if (canMesh(updated[i], updated[j])) {
-        updated[i].meshedWith.push(updated[j].id);
-        updated[j].meshedWith.push(updated[i].id);
+      const gearA = updated[i]!;
+      const gearB = updated[j]!;
+      if (canMesh(gearA, gearB)) {
+        gearA.meshedWith.push(gearB.id);
+        gearB.meshedWith.push(gearA.id);
       }
     }
   }
@@ -144,7 +146,7 @@ export function propagateRotation(gears: GearInstance[]): GearInstance[] {
   const assignedSpeed = new Map<string, number>();
 
   for (const gear of updated) {
-    if (gear.role === "start" && gear.rotationSpeed !== 0) {
+    if (gear.role === 'start' && gear.rotationSpeed !== 0) {
       visited.add(gear.id);
       queue.push(gear.id);
       assignedSpeed.set(gear.id, gear.rotationSpeed);
@@ -198,7 +200,7 @@ export function propagateRotation(gears: GearInstance[]): GearInstance[] {
       // Also lock the neighbors that caused the conflict
       for (const nId of lockedGear.meshedWith) {
         const n = gearMap.get(nId)!;
-        if (n.role !== "start" && assignedSpeed.has(nId)) {
+        if (n.role !== 'start' && assignedSpeed.has(nId)) {
           // Check if this neighbor has another meshed neighbor that's also spinning
           // Only lock if this gear is part of the conflict (it's the bridge gear)
         }
@@ -212,21 +214,21 @@ export function propagateRotation(gears: GearInstance[]): GearInstance[] {
 // ─── Win condition check ───────────────────────────────────────────────────
 
 export function checkWinCondition(gears: GearInstance[]): boolean {
-  const goalGears = gears.filter((g) => g.role === "goal");
+  const goalGears = gears.filter((g) => g.role === 'goal');
   if (goalGears.length === 0) return false;
 
   return goalGears.every((goal) => {
     if (goal.rotationSpeed === 0) return false;
 
-    if (!goal.requiredDirection || goal.requiredDirection === "any") {
+    if (!goal.requiredDirection || goal.requiredDirection === 'any') {
       return true; // Just needs to be spinning
     }
 
-    if (goal.requiredDirection === "cw") {
+    if (goal.requiredDirection === 'cw') {
       return goal.rotationSpeed > 0;
     }
 
-    if (goal.requiredDirection === "ccw") {
+    if (goal.requiredDirection === 'ccw') {
       return goal.rotationSpeed < 0;
     }
 
@@ -238,9 +240,79 @@ export function checkWinCondition(gears: GearInstance[]): boolean {
 
 export function initializeStartGears(gears: GearInstance[]): GearInstance[] {
   return gears.map((g) => {
-    if (g.role === "start" && g.rotationSpeed === 0) {
+    if (g.role === 'start' && g.rotationSpeed === 0) {
       return { ...g, rotationSpeed: BASE_ROTATION_SPEED };
     }
     return g;
   });
+}
+
+/** Check whether a gear at the given center position would overlap with any existing gears */
+export function wouldOverlap(
+  centerPos: Position,
+  size: GearSize,
+  excludeIds: string[],
+  boardGears: GearInstance[]
+): boolean {
+  const radius = GEAR_DIMENSIONS[size].outerRadius;
+
+  for (const gear of boardGears) {
+    if (excludeIds.includes(gear.id)) continue;
+
+    const gearCenter = getGearCenter(gear);
+    const dist = distance(centerPos, gearCenter);
+    const minDist = radius + GEAR_DIMENSIONS[gear.size].outerRadius;
+
+    if (dist < minDist) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Find the nearest valid position for a gear that doesn't overlap with existing gears.
+ * If the current position is valid, returns it. Otherwise, searches in a spiral pattern
+ * for the closest valid position.
+ */
+export function findNearestValidPosition(
+  currentCenter: Position,
+  size: GearSize,
+  excludeIds: string[],
+  boardGears: GearInstance[],
+  maxSearchDistance: number = 200
+): Position {
+  // First check if current position is valid
+  if (!wouldOverlap(currentCenter, size, excludeIds, boardGears)) {
+    return currentCenter;
+  }
+
+  // Search in a spiral pattern for the nearest valid position
+  const stepSize = 10;
+  let distance = stepSize;
+
+  while (distance <= maxSearchDistance) {
+    // Check positions in a circle at this distance
+    const circumference = 2 * Math.PI * distance;
+    const numPoints = Math.max(8, Math.ceil(circumference / stepSize));
+
+    for (let i = 0; i < numPoints; i++) {
+      const angle = (i / numPoints) * 2 * Math.PI;
+      const testPos = {
+        x: currentCenter.x + Math.cos(angle) * distance,
+        y: currentCenter.y + Math.sin(angle) * distance,
+      };
+
+      if (!wouldOverlap(testPos, size, excludeIds, boardGears)) {
+        return testPos;
+      }
+    }
+
+    distance += stepSize;
+  }
+
+  // If no valid position found within max distance, return current position anyway
+  // (this prevents infinite loops, though in practice the board should have space)
+  return currentCenter;
 }

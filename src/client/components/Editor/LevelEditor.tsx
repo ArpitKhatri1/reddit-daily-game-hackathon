@@ -15,6 +15,8 @@ import {
   propagateRotation,
   initializeStartGears,
   checkWinCondition,
+  findNearestValidPosition,
+  getCenterFromTopLeft,
 } from '../../lib/engine';
 import { saveCustomLevel } from '../../lib/storage';
 import { saveDraft, publishLevel, publishDaily, toLevelData } from '../../lib/api';
@@ -304,10 +306,12 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
     [getBoardPos, mode, cancelPan]
   );
 
-  // ─── Drag: pointer move ─────────────────────────────────────────────────
-  const handlePointerMove = useCallback(
+  // ─── GLOBAL DRAG HANDLERS (Hoisted) ──────────────────────────────────────
+  const handleGlobalPointerMove = useCallback(
     (e: React.PointerEvent) => {
       if (!dragging) return;
+      e.preventDefault(); // Stop scrolling while dragging a gear
+
       const pos = getBoardPos(e.clientX, e.clientY);
       const dim = GEAR_DIMENSIONS[dragging.size];
       const gearPos: Position = {
@@ -330,18 +334,28 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
     [dragging, gears, getBoardPos]
   );
 
-  // ─── Drag: pointer up (place gear) ─────────────────────────────────────
-  const handlePointerUp = useCallback(() => {
+  const handleGlobalPointerUp = useCallback(() => {
     if (!dragging) return;
     const dim = GEAR_DIMENSIONS[dragging.size];
 
     // Snap if available, else free-place at cursor position
-    const placementPos: Position = dragging.snapTarget
+    let placementPos: Position = dragging.snapTarget
       ? {
           x: dragging.snapTarget.position.x - dim.outerRadius,
           y: dragging.snapTarget.position.y - dim.outerRadius,
         }
       : { x: dragging.currentPos.x, y: dragging.currentPos.y };
+
+    // Check overlaps and find valid position if needed
+    // (Optional: In editor we might be more lenient, but consistency is good)
+    const placementCenter = getCenterFromTopLeft(placementPos, dragging.size);
+    const excludeIds = dragging.gearId ? [dragging.gearId] : [];
+    const validCenter = findNearestValidPosition(placementCenter, dragging.size, excludeIds, gears);
+
+    placementPos = {
+      x: validCenter.x - dim.outerRadius,
+      y: validCenter.y - dim.outerRadius,
+    };
 
     if (dragging.isFixedGearDrag) {
       // Re-place the fixed gear (start/goal) at new position
@@ -378,7 +392,7 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
       setGears((prev) => propagateRotation([...prev, newGear]));
     }
     setDragging(null);
-  }, [dragging, mode]);
+  }, [dragging, mode, gears]);
 
   // ─── Build level definition helper ───────────────────────────────────────
   const buildLevelDef = (): LevelDefinition | null => {
@@ -462,7 +476,6 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
   };
 
   const confirmPublishDaily = async () => {
-    // Close the dialog and perform publish
     setShowDailyConfirm(false);
     const levelDef = buildLevelDef();
     if (!levelDef) return;
@@ -497,7 +510,20 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
   const lockedCount = gears.filter((g) => g.locked).length;
 
   return (
-    <div className="flex flex-col h-screen w-screen" style={{ background: '#2C1810' }}>
+    <div
+      className="flex flex-col h-screen w-screen"
+      style={{ background: '#2C1810' }}
+      // Handle global gear dragging here (hoisted from board)
+      onPointerMove={(e) => {
+        if (dragging) handleGlobalPointerMove(e);
+      }}
+      onPointerUp={(e) => {
+        if (dragging) handleGlobalPointerUp();
+      }}
+      onPointerLeave={(e) => {
+        if (dragging) handleGlobalPointerUp();
+      }}
+    >
       {/* Top bar */}
       <div
         className="flex items-center gap-3 px-4 py-2 shrink-0 flex-wrap"
@@ -657,19 +683,18 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
             }
           }}
           onPointerMove={(e) => {
-            if (dragging) {
-              handlePointerMove(e);
-            } else {
+            // Only handle Pan/Zoom if NOT dragging a gear.
+            // Gear dragging is handled by the root div.
+            if (!dragging) {
               pzPointerMove(e);
             }
           }}
           onPointerUp={(e) => {
+            // Only clean up Pan/Zoom.
             pzPointerUp(e);
-            handlePointerUp();
           }}
           onPointerLeave={(e) => {
             pzPointerUp(e);
-            handlePointerUp();
           }}
         >
           {/* Transformed canvas layer */}
@@ -789,7 +814,7 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
         >
           {/* Draggable inventory tray — horizontal row */}
           <div
-            className="flex items-center gap-2 px-3 py-2 overflow-x-auto"
+            className="flex items-center gap-2 px-3 py-2 overflow-x-auto h-18 overflow-y-hidden"
             style={{ borderBottom: '1px solid #5D4037' }}
           >
             <div
@@ -810,15 +835,16 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
                 style={{
                   border: '1px dashed #5D4037',
                   background: 'rgba(93,64,55,0.2)',
-                  transform: 'scale(0.6)',
+                  transform: 'scale(0.5)',
                   transformOrigin: 'center',
+                  touchAction: 'none', // Important: Prevents browser scroll capture on the ITEM itself
                 }}
                 onPointerDown={(e) => {
                   e.preventDefault();
                   handleInventoryDragStart(item, e.clientX, e.clientY);
                 }}
               >
-                <GearSVG size={item.size} role="positional" angle={0} />
+                <GearSVG size={'small'} role="positional" angle={0} />
               </div>
             ))}
           </div>

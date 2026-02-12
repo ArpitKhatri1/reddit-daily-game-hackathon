@@ -13,6 +13,8 @@ import {
   propagateRotation,
   checkWinCondition,
   initializeStartGears,
+  findNearestValidPosition,
+  getCenterFromTopLeft,
 } from '../../lib/engine';
 import { usePanZoom } from '../../hooks/usePanZoom';
 import GearSVG from '../Gear/GearSVG';
@@ -217,9 +219,15 @@ export default function GameBoard({
     [getBoardPos, cancelPan]
   );
 
-  const handlePointerMove = useCallback(
+  // ------------------------------------------------------------
+  // GLOBAL POINTER HANDLERS (Hoisted from Board to Root)
+  // ------------------------------------------------------------
+  const handleGlobalPointerMove = useCallback(
     (e: React.PointerEvent) => {
       if (!dragging) return;
+      // Prevent scrolling on mobile while dragging a gear
+      e.preventDefault();
+
       const pos = getBoardPos(e.clientX, e.clientY);
       const dim = GEAR_DIMENSIONS[dragging.size];
       const gearPos: Position = {
@@ -244,17 +252,28 @@ export default function GameBoard({
     [dragging, gears, getBoardPos]
   );
 
-  const handlePointerUp = useCallback(() => {
+  const handleGlobalPointerUp = useCallback(() => {
     if (!dragging) return;
     const dim = GEAR_DIMENSIONS[dragging.size];
 
     // Determine placement position: snap if available, else free-place at cursor
-    const placementPos: Position = dragging.snapTarget
+    let placementPos: Position = dragging.snapTarget
       ? {
           x: dragging.snapTarget.position.x - dim.outerRadius,
           y: dragging.snapTarget.position.y - dim.outerRadius,
         }
       : { x: dragging.currentPos.x, y: dragging.currentPos.y };
+
+    // Check if this position would cause an overlap, and if so, find nearest valid position
+    const placementCenter = getCenterFromTopLeft(placementPos, dragging.size);
+    const excludeIds = dragging.gearId ? [dragging.gearId] : [];
+    const validCenter = findNearestValidPosition(placementCenter, dragging.size, excludeIds, gears);
+
+    // Convert back to top-left position
+    placementPos = {
+      x: validCenter.x - dim.outerRadius,
+      y: validCenter.y - dim.outerRadius,
+    };
 
     const newGear: GearInstance = {
       id: dragging.gearId || dragging.inventoryId || 'gear-' + Date.now().toString(),
@@ -271,7 +290,7 @@ export default function GameBoard({
     }
     setGears((prev) => propagateRotation([...prev, newGear]));
     setDragging(null);
-  }, [dragging]);
+  }, [dragging, gears]);
 
   const handleGearContextMenu = useCallback((e: React.MouseEvent, gear: GearInstance) => {
     e.preventDefault();
@@ -284,10 +303,28 @@ export default function GameBoard({
   }, []);
 
   return (
-    <div className="flex flex-col h-screen w-screen" style={{ background: '#2C1810' }}>
+    <div
+      className="flex flex-col h-screen w-screen"
+      style={{ background: '#2C1810', touchAction: 'none' }} // Added touchAction: none here
+      onPointerMove={(e) => {
+        // If we are dragging a gear, the root handles it to allow dragging across sibling containers
+        if (dragging) {
+          handleGlobalPointerMove(e);
+        }
+      }}
+      onPointerUp={(e) => {
+        if (dragging) {
+          handleGlobalPointerUp();
+        }
+      }}
+      onPointerLeave={(e) => {
+        // Fallback: if cursor leaves window, drop the gear
+        if (dragging) handleGlobalPointerUp();
+      }}
+    >
       {/* Top bar (includes timer beside level name) */}
       <div
-        className="flex items-center justify-between px-6 py-3 shrink-0"
+        className="flex items-center justify-between px-3 py-2 sm:px-6 sm:py-3 shrink-0"
         style={{
           background: 'linear-gradient(to bottom, #3E2723, #2C1810)',
           borderBottom: '2px solid #5D4037',
@@ -295,7 +332,7 @@ export default function GameBoard({
       >
         <button
           onClick={onBack}
-          className="px-4 py-2 rounded font-bold text-sm cursor-pointer"
+          className="px-2 py-1 sm:px-4 sm:py-2 rounded font-bold text-xs sm:text-sm cursor-pointer"
           style={{
             background: '#5D4037',
             color: '#D7CCC8',
@@ -304,16 +341,16 @@ export default function GameBoard({
         >
           &larr; Back
         </button>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-1 justify-center ">
           <h2
-            className="text-lg font-bold"
+            className="text-sm sm:text-lg font-bold truncate max-w-[120px] sm:max-w-none mr-4"
             style={{ color: '#D7CCC8', fontFamily: 'Georgia, serif' }}
           >
             {level.name}
           </h2>
           {!won && (
             <span
-              className="text-sm font-mono font-bold tracking-wider"
+              className="text-xs sm:text-sm font-mono font-bold tracking-wider items-center"
               style={{ color: '#FFD54F' }}
               aria-live="polite"
             >
@@ -321,15 +358,15 @@ export default function GameBoard({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
           <button
             onClick={resetView}
-            className="px-2 py-1 rounded text-xs cursor-pointer"
+            className="px-1 py-0.5 sm:px-2 sm:py-1 rounded text-xs cursor-pointer"
             style={{ background: '#5D4037', color: '#D7CCC8', border: '1px solid #795548' }}
           >
             Reset View
           </button>
-          <span className="text-xs" style={{ color: '#A1887F' }}>
+          <span className="text-xs hidden sm:inline" style={{ color: '#A1887F' }}>
             {Math.round(zoom * 100)}%
           </span>
         </div>
@@ -348,25 +385,22 @@ export default function GameBoard({
           onPointerDown={(e) => {
             // Only start pan if not dragging a gear
             if (!dragging) {
-              // Prevent native touch scrolling from stealing the pointer on mobile
               e.preventDefault();
               pzPointerDown(e);
             }
           }}
           onPointerMove={(e) => {
-            if (dragging) {
-              handlePointerMove(e);
-            } else {
+            // Only handle Pan/Zoom move here. Gear dragging is handled by Root.
+            if (!dragging) {
               pzPointerMove(e);
             }
           }}
           onPointerUp={(e) => {
+            // Only handle Pan/Zoom end here. Gear dropping is handled by Root.
             pzPointerUp(e);
-            handlePointerUp();
           }}
           onPointerLeave={(e) => {
             pzPointerUp(e);
-            handlePointerUp();
           }}
         >
           {/* Transformed canvas layer */}

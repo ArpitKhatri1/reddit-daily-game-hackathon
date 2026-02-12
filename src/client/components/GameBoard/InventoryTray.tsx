@@ -18,14 +18,14 @@ export default function InventoryTray({ items, onDragStart }: InventoryTrayProps
 
   return (
     <div
-      className="flex items-center gap-3 h-18 px-3 py-2 shrink-0 overflow-x-auto overflow-y-hidden"
+      className="flex items-center gap-4 min-h-[5rem] md:h-28 px-4 py-2 shrink-0 overflow-x-auto overflow-y-hidden"
       style={{
         background: 'linear-gradient(to top, #3E2723, #4E342E)',
         borderTop: '2px solid #5D4037',
       }}
     >
       <div
-        className="text-xs font-bold uppercase tracking-wider whitespace-nowrap"
+        className="text-[10px] md:text-xs font-bold uppercase tracking-wider whitespace-nowrap"
         style={{ color: '#A1887F', fontFamily: 'Georgia, serif' }}
       >
         Inventory
@@ -38,26 +38,34 @@ export default function InventoryTray({ items, onDragStart }: InventoryTrayProps
       )}
 
       {Object.entries(grouped).map(([size, groupItems]) => (
-        <div key={size} className="flex flex-col items-center gap-0.5 shrink-0">
-          <div className="text-xs capitalize" style={{ color: '#8D6E63' }}>
-            {size} &times;{groupItems.length}
-          </div>
+        <div key={size} className="flex flex-col items-center justify-center shrink-0 min-w-[60px]">
+          {/* Label: Added leading-tight to save vertical space */}
           <div
-            className="cursor-grab active:cursor-grabbing p-3 rounded"
+            className="text-[10px] md:text-xs capitalize leading-tight mb-1"
+            style={{ color: '#8D6E63' }}
+          >
+            {size} <span className="opacity-70">×{groupItems.length}</span>
+          </div>
+
+          <div
+            className="cursor-grab active:cursor-grabbing p-1 md:p-2 rounded transition-transform hover:scale-110"
             style={{
               border: '1px dashed #5D4037',
               background: 'rgba(93,64,55,0.2)',
-              transform: 'scale(0.6)',
-              transformOrigin: 'center',
+              touchAction: 'none',
             }}
             onPointerDown={(e) => {
               e.preventDefault();
+              e.stopPropagation();
               const item = groupItems[0];
               if (!item) return;
               onDragStart(item, e.clientX, e.clientY);
             }}
           >
-            <GearSVG size="small" role="positional" angle={0} />
+            {/* Control size via the SVG prop or a wrapper div height */}
+            <div className="w-8 h-8 md:w-12 md:h-12 flex items-center justify-center scale-[0.5]">
+              <GearSVG size={'small'} role="positional" angle={0} />
+            </div>
           </div>
         </div>
       ))}
