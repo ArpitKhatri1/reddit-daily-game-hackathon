@@ -1,6 +1,6 @@
 {
   "private": true,
-  "name": "testappforhack",
+  "name": "gearit-up",
   "version": "0.0.0",
   "license": "BSD-3-Clause",
   "type": "module",
@@ -23,10 +23,10 @@
     "type-check": "tsc --build"
   },
   "dependencies": {
-    "@devvit/cli": "^0.12.12",
-    "@devvit/web": "0.12.3",
+    "@devvit/cli": "0.12.12",
+    "@devvit/web": "0.12.12",
     "clsx": "2.1.1",
-    "devvit": "^0.12.3",
+    "devvit": "0.12.12",
     "express": "5.1.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",

@@ -165,8 +165,8 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
         alert('Maximum 5 start gears allowed!');
         return;
       }
-      if (placingRole === 'goal' && goalCount >= 2) {
-        alert('Maximum 2 goal gears allowed!');
+      if (placingRole === 'goal' && goalCount >= 5) {
+        alert('Maximum 5 goal gears allowed!');
         return;
       }
 
@@ -209,6 +209,29 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
     },
     [mode]
   );
+
+  // ─── Recall all gears ──────────────────────────────────────────────────
+  const handleRecallGears = useCallback(() => {
+    if (mode === 'edit') {
+      // In edit mode, remove all positional gears and clear placed inventory tracking
+      setGears((prev) => {
+        const fixedGears = prev.filter((g) => g.role !== 'positional');
+        return propagateRotation(fixedGears);
+      });
+      setEditPlacedInventory([]);
+    } else if (mode === 'test') {
+      // In test mode, move all positional gears back to test inventory
+      setGears((prev) => {
+        const fixedGears = prev.filter((g) => g.role !== 'positional');
+        const recalledGears = prev.filter((g) => g.role === 'positional');
+        setTestInventory((inv) => [
+          ...inv,
+          ...recalledGears.map((g) => ({ id: g.id, size: g.size })),
+        ]);
+        return propagateRotation(fixedGears);
+      });
+    }
+  }, [mode]);
 
   // ─── Inventory management ───────────────────────────────────────────────
   const addInventoryGear = (size: GearSize) => {
@@ -557,13 +580,13 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
           type="text"
           value={levelName}
           onChange={(e) => setLevelName(e.target.value)}
-          className="px-3 py-1.5 rounded text-sm font-bold"
+          className="px-3 py-1.5 rounded text-sm font-bold  w-[100px] sm:w-[180px]"
           style={{
             background: '#4E342E',
             color: '#D7CCC8',
             border: '1px solid #795548',
-            width: 180,
           }}
+          placeholder="Level Name"
         />
 
         <div className="flex items-center gap-2 ml-2">
@@ -600,12 +623,18 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
           >
             {Math.round(zoom * 100)}% ↺
           </button>
+          <button
+            onClick={handleRecallGears}
+            className="px-2 py-0.5 rounded text-xs cursor-pointer"
+            style={{ background: '#5D4037', color: '#D7CCC8', border: '1px solid #795548' }}
+            title="Recall all gears to inventory"
+          >
+            Recall Gears
+          </button>
         </div>
 
-        <div className="flex-1" />
-
         {mode === 'edit' && (
-          <>
+          <div className="flex justify-between sm:justify-end flex-1 gap-3">
             <button
               onClick={startTest}
               className="px-3 py-1.5 rounded font-bold text-sm cursor-pointer"
@@ -624,7 +653,7 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
             >
               Save Draft
             </button>
-          </>
+          </div>
         )}
         {mode === 'test' && (
           <>
@@ -827,7 +856,7 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
         >
           {/* Draggable inventory tray — horizontal row */}
           <div
-            className="flex items-center gap-1 md:gap-2 px-1 md:px-3 py-2 overflow-x-auto h-22 overflow-y-hidden"
+            className="flex items-center gap-1 md:gap-2 px-1 md:px-3 py-2 overflow-x-auto h-24 overflow-y-hidden"
             style={{ borderBottom: '1px solid #5D4037' }}
           >
             <div
@@ -844,7 +873,7 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
             {Object.entries(groupedInventory).map(([size, groupItems]) => (
               <div
                 key={size}
-                className="flex flex-col items-center justify-center gap-1 shrink-0 mx-2 py-2"
+                className="flex flex-col items-center justify-center gap-1 shrink-0 mx-2 py-4"
               >
                 <div
                   className="text-[10px] md:text-xs capitalize leading-tight mb-1"
@@ -867,7 +896,7 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
                     handleInventoryDragStart(item, e.clientX, e.clientY);
                   }}
                 >
-                  <div className="w-8 h-8 md:w-12 md:h-12 flex items-center justify-center scale-[0.5]">
+                  <div className="w-8 h-8 md:w-12 md:h-12 flex items-center justify-center scale-[0.4]">
                     <GearSVG size={'small'} role="positional" angle={0} />
                   </div>
                 </div>
@@ -913,7 +942,7 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
                   className="px-3 py-1.5 rounded font-bold text-xs cursor-pointer"
                   style={btnStyle(placingRole === 'goal')}
                 >
-                  ■ Goal ({gears.filter((g) => g.role === 'goal').length}/2)
+                  ■ Goal ({gears.filter((g) => g.role === 'goal').length}/5)
                 </button>
 
                 {placingRole === 'goal' &&
@@ -981,10 +1010,6 @@ export default function LevelEditor({ onBack, existingLevel, isDailyMode }: Leve
                   ))}
                 </div>
               )}
-
-              <div className="text-xs italic" style={{ color: '#795548' }}>
-                Drag gears on board to reposition · Right-click to remove
-              </div>
             </div>
           )}
         </div>

@@ -26,7 +26,7 @@ export default function InventoryTray({ items, onDragStart }: InventoryTrayProps
     >
       <div
         className="text-[10px] md:text-xs font-bold uppercase tracking-wider whitespace-nowrap"
-        style={{ color: '#A1887F', fontFamily: 'Georgia, serif' }}
+        style={{ color: '#A1887F' }}
       >
         Inventory
       </div>

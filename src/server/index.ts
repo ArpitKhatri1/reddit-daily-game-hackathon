@@ -147,22 +147,24 @@ router.post('/api/solve', async (req, res): Promise<void> => {
       return;
     }
 
-    // Check if leaderboard still active (within 24h for daily puzzles)
-    const leaderboardActive = meta.leaderboardExpiresAt
-      ? new Date(meta.leaderboardExpiresAt).getTime() > Date.now()
-      : true; // user levels always accept solves
+    // Always accept solves for leaderboard (no time limit)
+    const leaderboardActive = true;
 
-    // Check if already solved
+    // Check if already solved - allow updating if new time is faster
     const existingScore = await redis.zScore(`post:${postId}:leaderboard`, username);
     if (existingScore !== undefined && existingScore !== null) {
-      const leaderboard = await getLeaderboard(postId);
-      const response: SubmitSolveResponse = {
-        status: 'already_solved',
-        leaderboard,
-        message: 'You already solved this puzzle!',
-      };
-      res.json(response);
-      return;
+      if (timeMs >= existingScore) {
+        // New time is slower or equal, don't update
+        const leaderboard = await getLeaderboard(postId);
+        const response: SubmitSolveResponse = {
+          status: 'already_solved',
+          leaderboard,
+          message: 'You already have a faster solve time!',
+        };
+        res.json(response);
+        return;
+      }
+      // New time is faster, will update the entry below
     }
 
     // Record solve

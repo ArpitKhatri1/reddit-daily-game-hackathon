@@ -2,7 +2,6 @@ import type { LeaderboardEntry } from '../../../shared/types/api';
 
 interface LeaderboardProps {
   entries: LeaderboardEntry[];
-  active: boolean;
   currentUser?: string;
 }
 
@@ -14,8 +13,8 @@ function formatTime(ms: number): string {
   return `${secs}.${Math.floor((ms % 1000) / 100)}s`;
 }
 
-export default function Leaderboard({ entries, active, currentUser }: LeaderboardProps) {
-  if (entries.length === 0 && !active) return null;
+export default function Leaderboard({ entries, currentUser }: LeaderboardProps) {
+  if (entries.length === 0) return null;
 
   return (
     <div
@@ -32,28 +31,15 @@ export default function Leaderboard({ entries, active, currentUser }: Leaderboar
           borderBottom: '1px solid #5D4037',
         }}
       >
-        <span
-          className="text-xs font-bold uppercase tracking-wider"
-          style={{ color: '#FFD54F', fontFamily: 'Georgia, serif' }}
-        >
-          🏆 Leaderboard
+        <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#FFD54F' }}>
+          Leaderboard
         </span>
-        {active && (
-          <span
-            className="text-xs px-2 py-0.5 rounded"
-            style={{ background: '#388E3C', color: '#fff' }}
-          >
-            LIVE
-          </span>
-        )}
-        {!active && entries.length > 0 && (
-          <span
-            className="text-xs px-2 py-0.5 rounded"
-            style={{ background: '#795548', color: '#D7CCC8' }}
-          >
-            CLOSED
-          </span>
-        )}
+        <span
+          className="text-xs px-2 py-0.5 rounded"
+          style={{ background: '#388E3C', color: '#fff' }}
+        >
+          LIVE
+        </span>
       </div>
 
       {entries.length === 0 ? (
@@ -66,7 +52,7 @@ export default function Leaderboard({ entries, active, currentUser }: Leaderboar
         <div className="flex flex-col">
           {entries.slice(0, 10).map((entry, i) => {
             const isMe = currentUser === entry.username;
-            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`;
+            const medal = `#${i + 1}`;
             return (
               <div
                 key={entry.username}

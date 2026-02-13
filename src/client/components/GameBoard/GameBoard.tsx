@@ -302,6 +302,17 @@ export default function GameBoard({
     setInventory((prev) => [...prev, { id: gear.id, size: gear.size }]);
   }, []);
 
+  const handleRecallGears = useCallback(() => {
+    setGears((prev) => {
+      // Only keep fixed gears (non-positional)
+      const fixedGears = prev.filter((g) => g.role !== 'positional');
+      // Add all positional gears back to inventory
+      const recalledGears = prev.filter((g) => g.role === 'positional');
+      setInventory((inv) => [...inv, ...recalledGears.map((g) => ({ id: g.id, size: g.size }))]);
+      return propagateRotation(fixedGears);
+    });
+  }, []);
+
   return (
     <div
       className="flex flex-col h-screen w-screen"
@@ -312,12 +323,12 @@ export default function GameBoard({
           handleGlobalPointerMove(e);
         }
       }}
-      onPointerUp={(e) => {
+      onPointerUp={() => {
         if (dragging) {
           handleGlobalPointerUp();
         }
       }}
-      onPointerLeave={(e) => {
+      onPointerLeave={() => {
         // Fallback: if cursor leaves window, drop the gear
         if (dragging) handleGlobalPointerUp();
       }}
@@ -343,8 +354,8 @@ export default function GameBoard({
         </button>
         <div className="flex items-center gap-3 flex-1 justify-center ">
           <h2
-            className="text-sm sm:text-lg font-bold truncate max-w-[120px] sm:max-w-none mr-4"
-            style={{ color: '#D7CCC8', fontFamily: 'Georgia, serif' }}
+            className="text-sm sm:text-lg font-bold truncate max-w-[120px] sm:max-w-none mr-4 hidden sm:block"
+            style={{ color: '#D7CCC8' }}
           >
             {level.name}
           </h2>
@@ -359,6 +370,14 @@ export default function GameBoard({
           )}
         </div>
         <div className="flex items-center gap-1 sm:gap-2">
+          <button
+            onClick={handleRecallGears}
+            className="px-1 py-0.5 sm:px-2 sm:py-1 rounded text-xs cursor-pointer"
+            style={{ background: '#5D4037', color: '#D7CCC8', border: '1px solid #795548' }}
+            title="Recall all gears to inventory"
+          >
+            Recall Gears
+          </button>
           <button
             onClick={resetView}
             className="px-1 py-0.5 sm:px-2 sm:py-1 rounded text-xs cursor-pointer"
@@ -474,7 +493,7 @@ export default function GameBoard({
                 style={{
                   left: dragging.currentPos.x,
                   top: dragging.currentPos.y,
-                  opacity: dragging.snapTarget ? 0.3 : 0.7,
+                  opacity: dragging.snapTarget ? 0.6 : 0.7,
                 }}
               >
                 <GearSVG size={dragging.size} role="positional" angle={0} />

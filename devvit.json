@@ -4,7 +4,7 @@
     "redis": true
   },
   "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
-  "name": "testappforhack",
+  "name": "gearit-up",
   "post": {
     "dir": "dist/client",
     "entrypoints": {
@@ -27,7 +27,7 @@
   "menu": {
     "items": [
       {
-        "label": "Create Gear Puzzle Post",
+        "label": "Create Gear It up Post",
         "description": "Create a new Gear Puzzle post",
         "location": "subreddit",
         "forUserType": "moderator",
@@ -39,6 +39,6 @@
     "onAppInstall": "/internal/on-app-install"
   },
   "dev": {
-    "subreddit": "testappforhack_dev"
+    "subreddit": "gearit_up_dev"
   }
 }

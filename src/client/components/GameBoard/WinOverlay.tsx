@@ -7,7 +7,6 @@ interface WinOverlayProps {
   timeTakenMs: number;
   onContinue: () => void;
   leaderboard?: LeaderboardEntry[];
-  leaderboardActive?: boolean;
   rank?: number;
   currentUser?: string;
   message?: string;
@@ -18,7 +17,6 @@ export default function WinOverlay({
   timeTakenMs,
   onContinue,
   leaderboard,
-  leaderboardActive,
   rank,
   currentUser,
   message,
@@ -94,7 +92,7 @@ export default function WinOverlay({
           className="text-3xl font-bold mb-2"
           style={{
             color: '#FFD54F',
-            fontFamily: 'Georgia, serif',
+
             textShadow: '0 2px 8px rgba(255,213,79,0.5)',
           }}
         >
@@ -105,9 +103,9 @@ export default function WinOverlay({
           Completed in <strong style={{ color: '#FFD54F' }}>{formatTime(timeTakenMs)}</strong>
         </p>
 
-        <p className="text-sm mb-4" style={{ color: '#A1887F' }}>
+        <p className="text-sm mb-4 text-center" style={{ color: '#A1887F' }}>
           {message || 'The gears aligned perfectly.'}
-          {rank && rank <= 10 && <span style={{ color: '#FFD54F' }}> 🏅 You ranked #{rank}!</span>}
+          {rank && rank <= 10 && <span style={{ color: '#FFD54F' }}> You ranked #{rank}!</span>}
         </p>
 
         {/* Leaderboard: hidden for 1.5s, continues to fetch in background */}
@@ -120,11 +118,7 @@ export default function WinOverlay({
         >
           {showLeaderboard ? (
             entries.length > 0 ? (
-              <Leaderboard
-                entries={entries}
-                active={leaderboardActive ?? false}
-                currentUser={currentUser ?? ''}
-              />
+              <Leaderboard entries={entries} currentUser={currentUser ?? ''} />
             ) : (
               <div className="p-3 text-center text-sm" style={{ color: '#A1887F' }}>
                 {loading ? 'Loading leaderboard...' : 'No solves yet.'}

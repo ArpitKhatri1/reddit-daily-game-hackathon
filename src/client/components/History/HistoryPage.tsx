@@ -100,10 +100,7 @@ export default function HistoryPage() {
         >
           &larr; Home
         </button>
-        <h2
-          className="text-xl font-bold"
-          style={{ color: '#D7CCC8', fontFamily: 'Georgia, serif' }}
-        >
+        <h2 className="text-xl font-bold" style={{ color: '#D7CCC8' }}>
           History
         </h2>
       </div>
@@ -152,10 +149,7 @@ export default function HistoryPage() {
                       }}
                     >
                       <div className="flex flex-col gap-1">
-                        <div
-                          className="font-bold text-sm"
-                          style={{ color: '#D7CCC8', fontFamily: 'Georgia, serif' }}
-                        >
+                        <div className="font-bold text-sm" style={{ color: '#D7CCC8' }}>
                           {level.name}
                         </div>
                         {level.description && (
@@ -191,10 +185,7 @@ export default function HistoryPage() {
                     }}
                   >
                     <div className="flex flex-col gap-1">
-                      <div
-                        className="font-bold text-sm"
-                        style={{ color: '#FFD54F', fontFamily: 'Georgia, serif' }}
-                      >
+                      <div className="font-bold text-sm" style={{ color: '#FFD54F' }}>
                         Daily Puzzle #{entry.dailyNumber}
                       </div>
                       <div className="text-xs" style={{ color: '#8D6E63' }}>
@@ -210,7 +201,7 @@ export default function HistoryPage() {
                         border: '1px solid #FFB300',
                       }}
                     >
-                      ▶ Play
+                      Play
                     </button>
                   </div>
                 ))}
@@ -245,10 +236,7 @@ export default function HistoryPage() {
                     }}
                   >
                     <div className="flex flex-col gap-1">
-                      <div
-                        className="font-bold text-sm"
-                        style={{ color: '#D7CCC8', fontFamily: 'Georgia, serif' }}
-                      >
+                      <div className="font-bold text-sm" style={{ color: '#D7CCC8' }}>
                         {record.levelName}
                       </div>
                       <div className="text-xs" style={{ color: '#8D6E63' }}>

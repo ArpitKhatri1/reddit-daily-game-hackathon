@@ -1,2 +1,18 @@
 @import 'tailwindcss';
 
+/* VCR OSD Mono Font */
+@font-face {
+  font-family: 'VCR OSD Mono';
+  src: url('/VCR_OSD_MONO_1.001.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+/* Apply VCR OSD Mono as base font */
+html, body {
+  font-family: 'VCR OSD Mono', monospace;
+}
+
+::-webkit-scrollbar {
+  display: none;
+}

@@ -1,5 +1,6 @@
 import { Routes, Route, MemoryRouter } from 'react-router-dom';
 import HomePage from '../components/Home/HomePage';
+import HowToPlayPage from '../components/HowToPlay/HowToPlayPage';
 import PlayPage from '../components/Play/PlayPage';
 import EditorPage from '../components/Editor/EditorPage';
 import HistoryPage from '../components/History/HistoryPage';
@@ -10,6 +11,7 @@ export default function App() {
     <MemoryRouter>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/how-to-play" element={<HowToPlayPage />} />
         <Route path="/play" element={<PlayPage />} />
         <Route path="/play/:levelId" element={<PlayPage />} />
         <Route path="/editor" element={<EditorPage />} />

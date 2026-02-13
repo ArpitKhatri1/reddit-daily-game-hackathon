@@ -67,6 +67,7 @@ export function getSnapPosition(
  * Find the best snap target for a gear being dragged.
  * candidateCenter is the CENTER position of the dragged gear.
  * Returns the snap CENTER position and the anchor gear ID, or null if nothing close enough.
+ * Prefers positions that can mesh with multiple gears over single-gear snaps.
  */
 export function findSnapTarget(
   candidateCenter: Position,
@@ -75,8 +76,13 @@ export function findSnapTarget(
   boardGears: GearInstance[],
   snapTolerance: number
 ): { position: Position; anchorId: string } | null {
-  let bestDist = Infinity;
-  let bestResult: { position: Position; anchorId: string } | null = null;
+  const candidates: Array<{
+    position: Position;
+    anchorId: string;
+    maxDeviation: number;
+    meshCount: number;
+    anchorDistance: number;
+  }> = [];
 
   for (const gear of boardGears) {
     if (gear.id === candidateId) continue;
@@ -86,8 +92,7 @@ export function findSnapTarget(
     const dist = distance(gearCenter, candidateCenter);
     const diff = Math.abs(dist - ideal);
 
-    if (diff < snapTolerance && diff < bestDist) {
-      bestDist = diff;
+    if (diff < snapTolerance) {
       const snapCenter = getSnapPosition(gear, candidateCenter, candidateSize);
 
       // Make sure snap position doesn't overlap with any other gear
@@ -103,12 +108,47 @@ export function findSnapTarget(
       });
 
       if (!overlaps) {
-        bestResult = { position: snapCenter, anchorId: gear.id };
+        // Count how many gears this position could mesh with
+        let meshCount = 0;
+        let maxDeviation = diff;
+
+        for (const otherGear of boardGears) {
+          if (otherGear.id === candidateId) continue;
+
+          const otherCenter = getGearCenter(otherGear);
+          const otherDist = distance(snapCenter, otherCenter);
+          const otherIdeal = meshDistance(otherGear.size, candidateSize);
+          const otherDiff = Math.abs(otherDist - otherIdeal);
+
+          if (otherDiff <= MESH_TOLERANCE) {
+            meshCount++;
+            maxDeviation = Math.max(maxDeviation, otherDiff);
+          }
+        }
+
+        candidates.push({
+          position: snapCenter,
+          anchorId: gear.id,
+          maxDeviation,
+          meshCount,
+          anchorDistance: dist,
+        });
       }
     }
   }
 
-  return bestResult;
+  if (candidates.length === 0) return null;
+
+  // Sort by: most gears first, then closest anchor distance, then smallest max deviation
+  candidates.sort((a, b) => {
+    if (a.meshCount !== b.meshCount) return b.meshCount - a.meshCount;
+    if (Math.abs(a.anchorDistance - b.anchorDistance) > 1)
+      return a.anchorDistance - b.anchorDistance;
+    return a.maxDeviation - b.maxDeviation;
+  });
+
+  const best = candidates[0]!;
+  return { position: best.position, anchorId: best.anchorId };
 }
 
 // ─── Rotation propagation (BFS) ───────────────────────────────────────────

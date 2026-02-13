@@ -68,10 +68,7 @@ export default function MyLevelsPage() {
         >
           &larr; Home
         </button>
-        <h2
-          className="text-xl font-bold"
-          style={{ color: '#D7CCC8', fontFamily: 'Georgia, serif' }}
-        >
+        <h2 className="text-xl font-bold" style={{ color: '#D7CCC8' }}>
           Your Levels
         </h2>
       </div>
@@ -102,7 +99,6 @@ export default function MyLevelsPage() {
                 background: 'linear-gradient(to bottom, #66BB6A, #388E3C)',
                 color: '#fff',
                 border: '2px solid #4CAF50',
-                fontFamily: 'Georgia, serif',
               }}
             >
               &#9881; Create a Level
@@ -132,7 +128,6 @@ export default function MyLevelsPage() {
                           className="font-bold text-base"
                           style={{
                             color: '#D7CCC8',
-                            fontFamily: 'Georgia, serif',
                           }}
                         >
                           {ld.name}
@@ -244,7 +239,6 @@ export default function MyLevelsPage() {
                   background: 'linear-gradient(to bottom, #66BB6A, #388E3C)',
                   color: '#fff',
                   border: '2px solid #4CAF50',
-                  fontFamily: 'Georgia, serif',
                 }}
               >
                 + Create New Level

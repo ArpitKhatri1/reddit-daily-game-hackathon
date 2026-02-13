@@ -3,7 +3,7 @@ import type { LevelData } from '../../shared/types/api';
 
 export const createPost = async () => {
   return await reddit.submitCustomPost({
-    title: 'Gear Puzzle',
+    title: 'Welcome to Gear It Up',
   });
 };
 
@@ -21,8 +21,15 @@ export const createDailyPuzzlePost = async (dailyNumber: number) => {
   const { subredditName } = context;
   if (!subredditName) throw new Error('subredditName is required');
 
+  // Format current date as "12 February 2026"
+  const now = new Date();
+  const day = now.getDate();
+  const month = now.toLocaleString('en-US', { month: 'long' });
+  const year = now.getFullYear();
+  const formattedDate = `${day} ${month} ${year}`;
+
   return await reddit.submitCustomPost({
-    title: `Daily Puzzle #${dailyNumber}`,
+    title: `Daily Puzzle #${dailyNumber} - ${formattedDate}`,
     subredditName,
   });
 };

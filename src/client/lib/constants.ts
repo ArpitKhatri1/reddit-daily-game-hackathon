@@ -1,4 +1,4 @@
-import type { GearSize, GearDimension } from "../types";
+import type { GearSize, GearDimension } from '../types';
 
 // ─── Gear dimension lookup ─────────────────────────────────────────────────
 // outerRadius = baseRadius + toothDepth
@@ -39,25 +39,25 @@ export const GEAR_DIMENSIONS: Record<GearSize, GearDimension> = {
 
 export const ROLE_COLORS = {
   start: {
-    body: "#2E7D32",       // deep green
-    bodyDark: "#1B5E20",
-    teeth: "#388E3C",
-    highlight: "#66BB6A",
-    hole: "#1a1a1a",
+    body: '#2E7D32', // deep green
+    bodyDark: '#1B5E20',
+    teeth: '#388E3C',
+    highlight: '#66BB6A',
+    hole: '#1a1a1a',
   },
   goal: {
-    body: "#C62828",       // deep red
-    bodyDark: "#8E0000",
-    teeth: "#D32F2F",
-    highlight: "#EF5350",
-    hole: "#1a1a1a",
+    body: '#C62828', // deep red
+    bodyDark: '#8E0000',
+    teeth: '#D32F2F',
+    highlight: '#EF5350',
+    hole: '#1a1a1a',
   },
   positional: {
-    body: "#6D4C41",       // brown
-    bodyDark: "#4E342E",
-    teeth: "#795548",
-    highlight: "#A1887F",
-    hole: "#1a1a1a",
+    body: '#6D4C41', // brown
+    bodyDark: '#4E342E',
+    teeth: '#795548',
+    highlight: '#A1887F',
+    hole: '#1a1a1a',
   },
 } as const;
 
@@ -67,7 +67,7 @@ export const ROLE_COLORS = {
 export const BASE_ROTATION_SPEED = 0.8;
 
 /** Snap tolerance: how close (in px) a dragged gear must be to a mesh point to snap */
-export const SNAP_TOLERANCE = 40;
+export const SNAP_TOLERANCE = 15;
 
 /** How close gears need to be to their ideal mesh distance to engage */
 export const MESH_TOLERANCE = 8;
@@ -80,7 +80,7 @@ export const BOARD_HEIGHT = 800;
 // ─── Storage keys ──────────────────────────────────────────────────────────
 
 export const STORAGE_KEYS = {
-  CUSTOM_LEVELS: "gearpuzzle_custom_levels",
-  GAME_HISTORY: "gearpuzzle_game_history",
-  DAILY_SEED: "gearpuzzle_daily_seed",
+  CUSTOM_LEVELS: 'gearpuzzle_custom_levels',
+  GAME_HISTORY: 'gearpuzzle_game_history',
+  DAILY_SEED: 'gearpuzzle_daily_seed',
 } as const;
